@@ -1,2 +1,16 @@
 *.o
-*.a
+*.d
+
+tfstool
+
+# kernel binary file and memory mapping
+buenos
+buenos.map
+
+# virtual storage file
+store.file
+
+# runtime socket
+tty0.socket
+
+

@@ -1,1 +1,6 @@
-JEE
+Eclipse debug:
+
+1) lataa ftp://sourceware.org/pub/gdb/releases/gdb-7.0.1a.tar.gz
+2) sudo aptitude install libncurses5-dev
+2) pura + sen jälkeen:
+./configure --disable-werror --prefix=$PREFIX -with-mpc=$PREFIX --target=mipsisa32-elf --program-prefix=mips-elf-

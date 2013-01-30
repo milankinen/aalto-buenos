@@ -36,6 +36,10 @@
 #ifndef BUENOS_LIB_LIBC_H
 #define BUENOS_LIB_LIBC_H
 
+#ifndef NULL
+#define NULL 0
+#endif
+
 /* This should come with the compiler (at least GCC) */
 #include <stdarg.h>
 #include <stddef.h>

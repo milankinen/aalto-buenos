@@ -1,5 +1,7 @@
 Eclipse debug:
 
+Following
+
 1) lataa ftp://sourceware.org/pub/gdb/releases/gdb-7.0.1a.tar.gz
 2) sudo aptitude install libncurses5-dev
 3) pura + sen jälkeen:

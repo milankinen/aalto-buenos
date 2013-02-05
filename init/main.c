@@ -56,6 +56,7 @@
 #include "net/network.h"
 #include "proc/process.h"
 #include "vm/vm.h"
+#include "kernel_tests/makeWater.h"
 
 /**
  * Fallback function for system startup. This function is executed
@@ -99,6 +100,15 @@ void init_startup_fallback(void) {
         gcd->write(gcd, buffer, len);
 
 	DEBUG("debuginit", "Console test done, %d bytes written\n", len);
+    }
+    else if(bootargs_get("makewater") != NULL) {
+
+    	kwrite("Running makewater test problem\n");
+    	startMakeWater();
+    	while(!isWaterTestFinished()){
+    		thread_switch();
+    	}
+
     }
 
     /* Nothing else to do, so we shut the system down. */

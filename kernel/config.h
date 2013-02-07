@@ -42,6 +42,11 @@
  */
 #define CONFIG_MAX_THREADS 32
 
+#ifdef CHANGED_1
+#define CONFIG_MAX_LOCKS 128
+#define CONFIG_MAX_CONDITION_VARIABLES 128
+#endif
+
 /* Size of the stack of a kernel thread */
 #define CONFIG_THREAD_STACKSIZE 4096
 

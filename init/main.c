@@ -51,12 +51,15 @@
 #include "kernel/scheduler.h"
 #include "kernel/synch.h"
 #include "kernel/thread.h"
+#include "kernel/lock_cond.h"
 #include "lib/debug.h"
 #include "lib/libc.h"
 #include "net/network.h"
 #include "proc/process.h"
 #include "vm/vm.h"
+
 #include "kernel_tests/makeWater.h"
+#include "kernel_tests/change_1_tests.h"
 
 /**
  * Fallback function for system startup. This function is executed
@@ -101,7 +104,7 @@ void init_startup_fallback(void) {
 
 	DEBUG("debuginit", "Console test done, %d bytes written\n", len);
     }
-    else if(bootargs_get("makewater") != NULL) {
+    else if(bootargs_get("toy_probs") != NULL) {
 
     	kwrite("Running makewater test problem\n");
     	startMakeWater();
@@ -109,6 +112,11 @@ void init_startup_fallback(void) {
     		thread_switch();
     	}
 
+    } else if (bootargs_get("kernel_tests") != NULL) {
+        #ifdef CHANGED_1
+        kwrite("Running kernel tests for phase 1...\n");
+        run_lock_tests();
+        #endif
     }
 
     /* Nothing else to do, so we shut the system down. */
@@ -208,6 +216,12 @@ void init(void)
 
     kwrite("Initializing sleep queue\n");
     sleepq_init();
+
+    #ifdef CHANGED_1
+    kwrite("Initializing locks and conditions\n");
+    lock_table_init();
+    cond_table_init();
+    #endif
 
     kwrite("Initializing semaphores\n");
     semaphore_init();

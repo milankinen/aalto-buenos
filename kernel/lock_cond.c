@@ -2,6 +2,8 @@
  * created by Jaakko
  */
 
+#ifdef CHANGED_1
+
 #include "lib/types.h"
 #include "kernel/config.h"
 #include "kernel/assert.h"
@@ -15,24 +17,10 @@
 
 /* definitions for the locks and condition variables */
 
-#define NO_THREAD -1
-#define RESERVED_THREAD -2
+#define LOCK_NO_THREAD -1
+#define LOCK_RESERVED_THREAD -2
 
-/* data structures for lock_t and cond_t */
 
-struct lock_s {
-    spinlock_t slock;
-    TID_t locked_id;
-    uint32_t nested_locking_count;
-    uint32_t waiting_thread_count;
-    int8_t is_used;
-};
-
-struct cond_s {
-    spinlock_t slock;
-    uint32_t waiting_thread_count;
-    int8_t is_used;
-};
 
 /* spinlocks and tables they cover */
 
@@ -40,12 +28,30 @@ spinlock_t lock_table_slock;
 lock_t lock_table[CONFIG_MAX_LOCKS];
 
 spinlock_t cond_table_slock;
-cond_t cond_table[CONFIG_MAX_CONDS];
+cond_t cond_table[CONFIG_MAX_CONDITION_VARIABLES];
+
+/**
+ * These helper functions are meant for spinlock locking (so that interrupt disabling
+ * won't forgot).
+ * Proper compilers will optimize these function calls away for performance.
+ */
+/*
+static interrupt_status_t s_acquire(spinlock_t* spin_lock) {
+    interrupt_status_t prev_int_stat;
+    prev_int_stat = _interrupt_disable();
+    spinlock_acquire(spin_lock);
+    return prev_int_stat;
+}
+*/
+static void s_release(spinlock_t* spin_lock, interrupt_status_t prev_status) {
+    spinlock_release(spin_lock);
+    _interrupt_set_state(prev_status);
+}
 
 /* init functions */
 
-void lock_init(void) {
-    int i;
+void lock_table_init(void) {
+    uint32_t i;
     /* Start by acquiring the lock_table_slock.
      * Interrupts need to be disabled and the lock initialized.
      */
@@ -57,19 +63,18 @@ void lock_init(void) {
 
     /* initialize all locks unused */
     for (i = 0; i < CONFIG_MAX_LOCKS; i++) {
-        spinlock_reset(&lock_table[i].slock);
-        lock_table[i].locked_id = NO_THREAD;
+        spinlock_reset(&(lock_table[i].slock));
+        lock_table[i].locked_id = LOCK_NO_THREAD;
         lock_table[i].nested_locking_count = 0;
         lock_table[i].waiting_thread_count = 0;
         lock_table[i].is_used = 0;
     }
     
     /* release spinlock and set interrupt to previous state */
-    spinlock_release(&lock_table_slock);
-    _interrupt_set_state(prev_int_stat);
+    s_release(&lock_table_slock, prev_int_stat);
 }
 
-void cond_init(void) {
+void cond_table_init(void) {
     int i;
     /* Start by acquiring the cond_table_slock.
      * Interrupts need to be disabled and the lock initialized.
@@ -81,7 +86,7 @@ void cond_init(void) {
     spinlock_acquire(&cond_table_slock);
 
     /* initialize all conds unused */
-    for (i = 0; i < CONFIG_MAX_CONDS; i++) {
+    for (i = 0; i < CONFIG_MAX_CONDITION_VARIABLES; i++) {
         spinlock_reset(&cond_table[i].slock);
         cond_table[i].waiting_thread_count = 0;
         cond_table[i].is_used = 0;
@@ -101,6 +106,7 @@ lock_t *lock_create(void) {
      */
     interrupt_status_t prev_int_stat = _interrupt_disable();
     spinlock_acquire(&lock_table_slock);
+    lock_t* lock_to_return;
 
     /* critical section: find next unused lock and set it used and
      * return the address
@@ -110,9 +116,10 @@ lock_t *lock_create(void) {
             lock_table[i].is_used = 1;
             /* found unused, release lock and return interrupt status
              * back to original */
+            lock_to_return = lock_table + i;
             spinlock_release(&lock_table_slock);
             _interrupt_set_state(prev_int_stat);
-            return &lock_table[i];
+            return lock_to_return;
         }
     }
 
@@ -130,7 +137,7 @@ void lock_destroy(lock_t *lock) {
 
     spinlock_acquire(&lock->slock);
     /* critical section: check that lock is open if not panic*/
-    KERNEL_ASSERT(lock->locked_id == NO_THREAD);
+    KERNEL_ASSERT(lock->locked_id == LOCK_NO_THREAD);
 
     /* mark lock unused */
     lock->is_used = 0;
@@ -147,9 +154,11 @@ void lock_acquire(lock_t *lock) {
     interrupt_status_t prev_int_stat = _interrupt_disable();
     spinlock_acquire(&lock->slock);
 
+
     /* if lock was open */
-    if (lock->locked_id == NO_THREAD) {
+    if (lock->locked_id == LOCK_NO_THREAD) {
         lock->locked_id = thread_get_current_thread();
+        //kprintf("acquire %d", lock->locked_id);
         lock->nested_locking_count = 1;
         /* lock is now acquired and spinlock can be released
          * and interrupts returned to original state
@@ -196,6 +205,8 @@ void lock_release(lock_t *lock) {
     interrupt_status_t prev_int_stat = _interrupt_disable();
     spinlock_acquire(&lock->slock);
 
+    //kprintf("release %d . %d", lock->locked_id, thread_get_current_thread());
+
     /* releasing some other threads lock is not allowed */
     KERNEL_ASSERT(lock->locked_id == thread_get_current_thread());
 
@@ -209,16 +220,20 @@ void lock_release(lock_t *lock) {
         _interrupt_set_state(prev_int_stat);
         return;
     }
+
+    // set to zero if lock is about to be released
+    lock->nested_locking_count = 0;
+
     /* Here we need to release the lock and wake up a thread if any */
     if (lock->waiting_thread_count > 0) {
         sleepq_wake(&lock->slock);
-        /* set locked thread to RESERVED_THREAD instead of
-         * NO_THREAD to prevent jumping the sleep queue
+        /* set locked thread to LOCK_RESERVED_THREAD instead of
+         * LOCK_NO_THREAD to prevent jumping the sleep queue
          */
-        lock->locked_id = RESERVED_THREAD;
+        lock->locked_id = LOCK_RESERVED_THREAD;
     } else { /* lock->waiting_thread_count == 0 */
         /* there are no threads in queue */
-        lock->locked_id = NO_THREAD;
+        lock->locked_id = LOCK_NO_THREAD;
     }
     /* release and return again */
     spinlock_release(&lock->slock);
@@ -243,3 +258,6 @@ void condition_signal(cond_t *cond, lock_t *condition_lock) {
 
 void condition_broadcast(cond_t *cond, lock_t *condition_lock) {
 }*/
+
+
+#endif

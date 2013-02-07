@@ -7,18 +7,33 @@
 
 #ifdef CHANGED_1
 
-typedef struct lock_s lock_t;
 
-void lock_init(void);
+/* data structures for lock_t and cond_t */
+
+typedef struct {
+    spinlock_t slock;
+    TID_t locked_id;
+    uint32_t nested_locking_count;
+    uint32_t waiting_thread_count;
+    int8_t is_used;
+} lock_t;
+
+typedef struct {
+    spinlock_t slock;
+    uint32_t waiting_thread_count;
+    int8_t is_used;
+} cond_t;
+
+
+void lock_table_init(void);
 
 lock_t *lock_create(void);
 void lock_destroy(lock_t *lock);
 void lock_acquire(lock_t *lock);
 void lock_release(lock_t *lock);
 
-typedef struct cond_s cond_t;
 
-void cond_init(void);
+void cond_table_init(void);
 
 cond_t *condition_create(void);
 void condition_destroy(cond_t *cond);

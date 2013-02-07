@@ -76,8 +76,21 @@ typedef struct {
     /* pointer to the next thread in list (<0 = end of list) */
     TID_t next; 
 
+    #ifdef CHANGED_1
+
+    /* linked list "pointer" to next sleeping thread */
+    TID_t next_sleeper_id;
+    /* time when this thread should be woken up. if 0 then this thread is not asleep */
+    uint32_t wakeup_time;
+
+    /* pad to 64 bytes */
+    uint32_t dummy_alignment_fill[7];
+
+    #else
     /* pad to 64 bytes */
     uint32_t dummy_alignment_fill[9]; 
+    #endif
+
 } thread_table_t;
 
 /* function prototypes */
@@ -95,6 +108,9 @@ void thread_goto_userland(context_t *usercontext);
 
 void thread_finish(void);
 
+#ifdef CHANGED_1
+void thread_sleep(uint32_t sleep_time_in_milliseconds);
+#endif
 
 #define USERLAND_ENABLE_BIT 0x00000010
 

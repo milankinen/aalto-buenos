@@ -35,6 +35,7 @@
  */
 
 #include "kernel/thread.h"
+#include "drivers/metadev.h"
 #include "kernel/spinlock.h"
 #include "kernel/assert.h"
 #include "kernel/panic.h"
@@ -52,6 +53,10 @@
 /* Import thread table and its lock from thread.c */
 extern spinlock_t thread_table_slock;
 extern thread_table_t thread_table[CONFIG_MAX_THREADS];
+
+#ifdef CHANGED_1
+extern TID_t thread_next_sleeper_id;
+#endif
 
 /** Currently running thread on each CPU */
 TID_t scheduler_current_thread[CONFIG_MAX_CPUS];
@@ -165,6 +170,40 @@ void scheduler_add_ready(TID_t t)
 }
 
 
+#ifdef CHANGED_1
+/**
+ * Loops all timed sleeper threads and wakes them if their sleeping time
+ * has expired. This assumes that thread_table_slock is acquired and interrupts
+ * are disabled.
+ */
+static void scheduler_wakeup_expired_sleepers() {
+    if (thread_next_sleeper_id == -1) {
+        // performance issue: don't fetch timer value if no threads are waiting
+        return;
+    }
+    uint32_t cur_time = rtc_get_msec();
+    while (thread_next_sleeper_id != -1) {
+        if (thread_table[thread_next_sleeper_id].wakeup_time < cur_time) {
+            // thread is about to wake up, null its sleep status
+            TID_t next_tid = thread_table[thread_next_sleeper_id].next_sleeper_id;
+            thread_table[thread_next_sleeper_id].next_sleeper_id = -1;
+            thread_table[thread_next_sleeper_id].wakeup_time = 0;
+            // add to ready list and mark as ready
+            scheduler_add_to_ready_list(thread_next_sleeper_id);
+            thread_table[thread_next_sleeper_id].state = THREAD_READY;
+            // correct sleeper linking
+            thread_next_sleeper_id = next_tid;
+        } else {
+            // thead sleep timer is not expired, skip rest (if any) because the list
+            // is ordered and rest threads wake even later
+            break;
+        }
+    }
+}
+
+#endif
+
+
 /**
  * Select next thread for running. Removes the currently running
  * thread running on this CPU and selects new running thread.
@@ -199,11 +238,27 @@ void scheduler_schedule(void)
 	current_thread->state = THREAD_FREE;
     } else if(current_thread->sleeps_on != 0) {
 	current_thread->state = THREAD_SLEEPING;
+
+    #ifdef CHANGED_1
+    } else if (current_thread->wakeup_time != 0) {
+        // put thread to sleep if it has wakeup time set (in thread_sleep method)
+        current_thread->state = THREAD_SLEEPING;
+    #endif
+
     } else {
+
 	if(scheduler_current_thread[this_cpu] != IDLE_THREAD_TID)
 	    scheduler_add_to_ready_list(scheduler_current_thread[this_cpu]);
+    #ifdef CHANGED_1
+	else
+	    // wake up sleeping threads whose sleeping time has elapsed
+	    // only during idle thread (this was not real-time system ;)
+	    scheduler_wakeup_expired_sleepers();
+    #endif
 	current_thread->state = THREAD_READY;
+
     }
+
 
     t = scheduler_remove_first_ready();
     thread_table[t].state = THREAD_RUNNING;

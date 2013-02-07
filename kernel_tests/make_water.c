@@ -1,12 +1,9 @@
 /*
- * makeWater.c
- *
- *  Created on: 5 Feb 2013
- *      Author: matti
+ * make_water.c
  */
 
 
-#include "kernel_tests/makeWater.h"
+#include "kernel_tests/make_water.h"
 #include "kernel/semaphore.h"
 #include "kernel/thread.h"
 #include "kernel/halt.h"
@@ -17,14 +14,14 @@ semaphore_t *omutex; //only one oxygen may created water at a given time
 int testFinished;
 int waterCreated;
 
-void startMakeWater(){
+void start_make_water(){
 	semaphore_init();
 	testFinished = 0;
 	waterCreated = 0;
 	hydrogensReady = semaphore_create(0);
 	hydrogensWaiting = semaphore_create(0);
 	omutex = semaphore_create(1);
-	spawnAtoms();
+	spawn_atoms();
 }
 
 void hydrogen(uint32_t dummy){
@@ -41,56 +38,56 @@ void oxygen(uint32_t dummy){
 	semaphore_P(hydrogensReady);
 	semaphore_P(hydrogensReady);
 	semaphore_V(omutex);
-	makeWater();
+	make_water();
 	semaphore_V(hydrogensWaiting);
 	semaphore_V(hydrogensWaiting);
 
 }
 
-void hydrogenThread(){
+void hydrogen_t(){
 	TID_t tid = thread_create(&hydrogen, 0);
 	thread_run(tid);
 }
 
-void oxygenThread(){
+void oxygen_t(){
 	TID_t tid = thread_create(&oxygen, 0);
 	thread_run(tid);
 }
 
-void makeWater(){
+void make_water(){
 	kprintf("WATER CREATED\n");
 	waterCreated++;
 }
 
-void spawnAtoms(){
+void spawn_atoms(){
 
 	//check that the test does not go to a infite loop if it fails
 	int fallback = 0;
 
-	oxygenThread();
-	oxygenThread();
-	hydrogenThread();
-	hydrogenThread();
+	oxygen_t();
+	oxygen_t();
+	hydrogen_t();
+	hydrogen_t();
 	while(waterCreated!=1){
 		kprintf("Waiting water to be created\n");
-		checkFallBack(++fallback);
+		check_fallback(++fallback);
 		thread_switch();
 	}
-	hydrogenThread();
-	hydrogenThread();
+	hydrogen_t();
+	hydrogen_t();
 	while(waterCreated!=2){
 		kprintf("Waiting water to be created\n");
-		checkFallBack(++fallback);
+		check_fallback(++fallback);
 		thread_switch();
 	}
 	kprintf("Make Water test execution finished succesfully\n");
 	testFinished = 1;
 }
-int isWaterTestFinished(void){
+int is_water_test_finished(void){
 	return testFinished;
 }
 
-void checkFallBack(int i){
+void check_fallback(int i){
 	if(i > 100){
 		kprintf("makeWater test execution finished with ERRORS, terminating kernel\n");
 		halt_kernel();

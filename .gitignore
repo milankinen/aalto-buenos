@@ -13,4 +13,6 @@ store.file
 # runtime socket
 tty0.socket
 
-
+#halt
+halt
+halt.map

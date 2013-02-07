@@ -116,6 +116,7 @@ void init_startup_fallback(void) {
         #ifdef CHANGED_1
         kwrite("Running kernel tests for phase 1...\n");
         run_lock_tests();
+        run_cond_tests();
         #endif
     }
 

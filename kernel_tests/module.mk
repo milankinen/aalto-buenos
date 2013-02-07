@@ -4,7 +4,7 @@
 MODULE := kernel_tests
 
 
-FILES := makeWater.c lock_tests.c
+FILES := makeWater.c lock_tests.c cond_tests.c
 
 SRC += $(patsubst %, $(MODULE)/%, $(FILES))
 

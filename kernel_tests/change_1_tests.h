@@ -12,7 +12,7 @@
 
 
 void run_lock_tests();
-
+void run_cond_tests();
 
 
 #endif

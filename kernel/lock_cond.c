@@ -25,10 +25,10 @@
 /* spinlocks and tables they cover */
 
 spinlock_t lock_table_slock;
-lock_t lock_table[CONFIG_MAX_LOCKS];
+static lock_t lock_table[CONFIG_MAX_LOCKS];
 
 spinlock_t cond_table_slock;
-cond_t cond_table[CONFIG_MAX_CONDITION_VARIABLES];
+static cond_t cond_table[CONFIG_MAX_CONDITION_VARIABLES];
 
 /**
  * These helper functions are meant for spinlock locking (so that interrupt disabling
@@ -96,6 +96,11 @@ void cond_table_init(void) {
     spinlock_release(&cond_table_slock);
     _interrupt_set_state(prev_int_stat);
 }
+
+
+
+/* ********************************************* */
+
 
 /* lock functions */
 
@@ -242,23 +247,116 @@ void lock_release(lock_t *lock) {
     return;
 }
 
+
+
+
 /* condition variable functions */
 
-/*cond_t *condition_create(void) {
+cond_t *condition_create(void) {
+    int i;
+    /* this changes the cond_table and thus
+     * requires aquiring a spinlock and disabling interrupts.
+     */
+    interrupt_status_t prev_int_stat = _interrupt_disable();
+    spinlock_acquire(&cond_table_slock);
+    cond_t* cond_to_return;
+
+    /* critical section: find next unused cond and set it used and
+     * return the address
+     */
+    for (i = 0; i < CONFIG_MAX_LOCKS; i++) {
+        if (!(cond_table[i].is_used)) {
+            cond_table[i].is_used = 1;
+            /* found unused, release cond and return interrupt status
+             * back to original */
+            cond_to_return = cond_table + i;
+            spinlock_release(&cond_table_slock);
+            _interrupt_set_state(prev_int_stat);
+            return cond_to_return;
+        }
+    }
+
+    /* Here all conds were used which is bad: panic*/
+    KERNEL_PANIC("cond_create(): no free condition variables");
     return 0;
 }
 
 void condition_destroy(cond_t *cond) {
+    KERNEL_ASSERT(cond);
+    /* this changes the lock_table and thus
+     * requires aquiring a spinlock and disabling interrupts.
+     */
+    interrupt_status_t prev_int_stat = _interrupt_disable();
+    spinlock_acquire(&cond_table_slock);
+
+    spinlock_acquire(&cond->slock);
+
+    /* test that no threads are waiting condition */
+    KERNEL_ASSERT(cond->waiting_thread_count == 0);
+
+    /* mark lock unused */
+    cond->is_used = 0;
+
+    spinlock_release(&cond->slock);
+    spinlock_release(&cond_table_slock);
+    _interrupt_set_state(prev_int_stat);
 }
 
+
 void condition_wait(cond_t *cond, lock_t *condition_lock) {
+    KERNEL_ASSERT(cond && condition_lock);
+    // lock cond variable
+    interrupt_status_t prev_int_stat = _interrupt_disable();
+    spinlock_acquire(&cond->slock);
+    // add this thread to sleepq
+    cond->waiting_thread_count++;
+    sleepq_add(&cond->slock);
+    // release lock for condition
+    lock_release(condition_lock);
+    // release spinlock and put thread to sleep
+    spinlock_release(&cond->slock);
+    thread_switch();
+    // zzzZZzzz
+    // now thread wakes up, it means that it is singaled
+
+    // restore interrupts and try to acquire lock
+    _interrupt_set_state(prev_int_stat);
+    lock_acquire(condition_lock);
 }
 
 void condition_signal(cond_t *cond, lock_t *condition_lock) {
+    KERNEL_ASSERT(cond && condition_lock);
+    // lock cond variable
+    interrupt_status_t prev_int_stat = _interrupt_disable();
+    spinlock_acquire(&cond->slock);
+    // check that we have threads waiting for signal
+    if (cond->waiting_thread_count > 0) {
+        // we have 1..n, wake the first one
+        cond->waiting_thread_count--;
+        sleepq_wake(&cond->slock);
+    }
+    // we dont need to release condition lock because this is non-blocking cond var
+    // just restore interrupts
+    spinlock_release(&cond->slock);
+    _interrupt_set_state(prev_int_stat);
 }
 
 void condition_broadcast(cond_t *cond, lock_t *condition_lock) {
-}*/
+    KERNEL_ASSERT(cond && condition_lock);
+    // lock cond variable
+    interrupt_status_t prev_int_stat = _interrupt_disable();
+    spinlock_acquire(&cond->slock);
+    // check that we have threads waiting for signal
+    if (cond->waiting_thread_count > 0) {
+        // we have 1..n, wake all!
+        cond->waiting_thread_count = 0;
+        sleepq_wake_all(&cond->slock);
+    }
+    // we dont need to release condition lock because this is non-blocking cond var
+    // just restore interrupts
+    spinlock_release(&cond->slock);
+    _interrupt_set_state(prev_int_stat);
+}
 
 
 #endif

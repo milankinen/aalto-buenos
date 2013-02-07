@@ -41,9 +41,25 @@ static void test_acquire_release() {
     lock_t* lock;
     lock = lock_create();
     KERNEL_ASSERT(lock != NULL);
+    KERNEL_ASSERT(lock->is_used);
     lock_acquire(lock);
     lock_release(lock);
     lock_destroy(lock);
+    KERNEL_ASSERT(!lock->is_used);
+    kprintf("OK!\n");
+}
+
+static void test_destroy_resource_free() {
+    kprintf("Testing that destroyed locks free their resources for later usage... ");
+    uint32_t i;
+    lock_t* lock;
+
+    for (i = 0 ; i < CONFIG_MAX_LOCKS * 2 ; i++) {
+        lock = lock_create();
+        KERNEL_ASSERT(lock->is_used);
+        lock_destroy(lock);
+        KERNEL_ASSERT(!lock->is_used);
+    }
     kprintf("OK!\n");
 }
 
@@ -62,8 +78,8 @@ static void fairness_thread(uint32_t nth) {
     lock_release(fairness_lock);
 }
 
-static void test_fairness() {
-    kprintf("Testing lock fairness... ");
+static void test_critical_and_fairness() {
+    kprintf("Testing lock critical section and fairness... ");
     const uint32_t thread_num = 10;
     fairness_test_value = 0;
     fairness_lock = lock_create();
@@ -133,11 +149,126 @@ static void test_reentrant() {
 
 
 
+static lock_t* interrupt_lock;
+
+static void test_int_create_destroy() {
+    lock_t* lock;
+    // enabled
+    interrupt_status_t start_state = _interrupt_enable();
+    interrupt_status_t test_state = _interrupt_get_state();
+    lock = lock_create();
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    lock_destroy(lock);
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    // disabled
+    _interrupt_disable();
+    test_state = _interrupt_get_state();
+    lock = lock_create();
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    lock_destroy(lock);
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    // return to original state
+    _interrupt_set_state(start_state);
+}
+
+
+static void test_int_enabled(uint32_t re_entrant_recursion) {
+    if (!re_entrant_recursion) {
+        return;
+    }
+    interrupt_status_t start_state = _interrupt_enable();
+    interrupt_status_t test_state = _interrupt_get_state();
+    lock_acquire(interrupt_lock);
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    // re-entrant locking testing also
+    test_int_enabled(re_entrant_recursion - 1);
+    lock_release(interrupt_lock);
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    // return original state
+    _interrupt_set_state(start_state);
+}
+
+static void test_int_disabled(uint32_t re_entrant_recursion) {
+    if (!re_entrant_recursion) {
+        return;
+    }
+    interrupt_status_t start_state = _interrupt_disable();
+    interrupt_status_t test_state = _interrupt_get_state();
+    lock_acquire(interrupt_lock);
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    // re-entrant locking testing also
+    test_int_disabled(re_entrant_recursion - 1);
+    lock_release(interrupt_lock);
+    KERNEL_ASSERT(test_state == _interrupt_get_state());
+    // return original state
+    _interrupt_set_state(start_state);
+    // prevent compiler errros
+}
+
+
+static void test_int_enabled_sleep(uint32_t wait_num) {
+    wait_until_threads(interrupt_lock, wait_num);
+    test_int_enabled(1);
+}
+
+static void test_int_disabled_sleep(uint32_t wait_num) {
+    wait_until_threads(interrupt_lock, wait_num);
+    test_int_enabled(1);
+}
+
+static void test_int_enabled_multithread(const uint32_t thread_num) {
+    uint32_t i;
+    lock_acquire(interrupt_lock);
+    for (i = 0 ; i < thread_num ; i++) {
+        thread_run(thread_create(test_int_enabled_sleep, 0));
+    }
+    // wait until our threads are
+    wait_until_threads(interrupt_lock, thread_num);
+    lock_release(interrupt_lock);
+    lock_acquire(interrupt_lock);
+    KERNEL_ASSERT(interrupt_lock->waiting_thread_count == 0);
+    lock_release(interrupt_lock);
+}
+
+static void test_int_disabled_multithread(const uint32_t thread_num) {
+    uint32_t i;
+    lock_acquire(interrupt_lock);
+    for (i = 0 ; i < thread_num ; i++) {
+        thread_run(thread_create(test_int_disabled_sleep, 0));
+    }
+    // wait until our threads are
+    wait_until_threads(interrupt_lock, thread_num);
+    lock_release(interrupt_lock);
+    lock_acquire(interrupt_lock);
+    KERNEL_ASSERT(interrupt_lock->waiting_thread_count == 0);
+    lock_release(interrupt_lock);
+}
+
+static void test_interrupt_preserving() {
+    kprintf("Testing lock interrupt state preserving... ");
+    test_int_create_destroy();
+    interrupt_lock = lock_create();
+
+    // single thread testing
+    test_int_enabled(2);
+    test_int_disabled(2);
+    // multi-thread testing
+    test_int_enabled_multithread(3);
+    test_int_disabled_multithread(3);
+
+    lock_destroy(interrupt_lock);
+    kprintf("OK!\n");
+}
+
+
+
 
 void run_lock_tests() {
     test_acquire_release();
-    test_fairness();
+    test_destroy_resource_free();
     test_reentrant();
+    test_critical_and_fairness();
+    test_interrupt_preserving();
 }
 
 

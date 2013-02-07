@@ -196,6 +196,7 @@ void lock_acquire(lock_t *lock) {
     lock->locked_id = thread_get_current_thread();
     lock->nested_locking_count = 1;
     spinlock_release(&lock->slock);
+    _interrupt_set_state(prev_int_stat);
 }
 
 void lock_release(lock_t *lock) {

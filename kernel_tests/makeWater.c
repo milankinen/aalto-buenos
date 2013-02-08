@@ -29,14 +29,14 @@ void startMakeWater(){
 
 void hydrogen(uint32_t dummy){
 	kprintf("CREATED HYDROGEN\n");
-	dummy = 0;
+	dummy = dummy;
 	semaphore_V(hydrogensReady);
 	semaphore_P(hydrogensWaiting);
 }
 
 void oxygen(uint32_t dummy){
 	kprintf("CREATED OXYGEN\n");
-	dummy = 0;
+	dummy = dummy;
 	semaphore_P(omutex);
 	semaphore_P(hydrogensReady);
 	semaphore_P(hydrogensReady);

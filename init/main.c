@@ -58,7 +58,7 @@
 #include "proc/process.h"
 #include "vm/vm.h"
 
-#include "kernel_tests/makeWater.h"
+#include "kernel_tests/make_water.h"
 #include "kernel_tests/change_1_tests.h"
 
 /**
@@ -107,8 +107,8 @@ void init_startup_fallback(void) {
     else if(bootargs_get("toy_probs") != NULL) {
 
     	kwrite("Running makewater test problem\n");
-    	startMakeWater();
-    	while(!isWaterTestFinished()){
+    	start_make_water();
+    	while(!is_water_test_finished()){
     		thread_switch();
     	}
 

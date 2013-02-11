@@ -88,6 +88,9 @@ static void test_wait_signal() {
     condition_signal(signal_cond, signal_lock);
     lock_release(signal_lock);
 
+    //give up remaining processor time to ensure the thread that wa
+    //waken up will proceed
+    thread_switch();
     // wait until other thread has finished
     lock_acquire(signal_lock);
     KERNEL_ASSERT(signal_test_value == orig_value + 2);

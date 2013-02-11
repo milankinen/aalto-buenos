@@ -190,7 +190,11 @@ void network_init(void)
     for(i=0; i<CONFIG_MAX_GNDS; i++) {
 	if(network_interfaces[i].gnd != NULL) {
 	    TID_t tid;
+#ifdef CHANGED_ADDITIONAL_1
+	    tid = thread_create(&network_receive_thread, i, THREAD_PRIORITY_NORMAL);
+#else
 	    tid = thread_create(&network_receive_thread, i);
+#endif
             /* Thread creation should succeed. If not, increase the
                number of threads in the system by editing config.h. */
 	    KERNEL_ASSERT(tid > 0);

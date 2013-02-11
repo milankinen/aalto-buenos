@@ -105,6 +105,7 @@ void init_startup_fallback(void) {
 
 	DEBUG("debuginit", "Console test done, %d bytes written\n", len);
     }
+#ifndef CHANGED_ADDITIONAL_1
 # ifdef CHANGED_1
     else if(bootargs_get("toy_probs") != NULL) {
 
@@ -117,15 +118,17 @@ void init_startup_fallback(void) {
     	while(!is_canal_test_finished()){
     		thread_switch();
     	}
-#endif
-    } else if (bootargs_get("kernel_tests") != NULL) {
+    }
+#endif /* CHANGED_1 */
+    else if (bootargs_get("kernel_tests") != NULL) {
         #ifdef CHANGED_1
         kwrite("Running kernel tests for phase 1...\n");
         run_lock_tests();
         run_cond_tests();
         run_thread_sleep_tests();
-        #endif
+        #endif /* CHANGED_1 */
     }
+#endif /* CHANGED_ADDITIONAL_1 */
 
     /* Nothing else to do, so we shut the system down. */
     kprintf("Startup fallback code ends.\n");
@@ -247,7 +250,11 @@ void init(void)
     vm_init();
 
     kprintf("Creating initialization thread\n");
+#ifdef CHANGED_ADDITIONAL_1
+    startup_thread = thread_create(&init_startup_thread, 0, THREAD_PRIORITY_HIGH);
+#else
     startup_thread = thread_create(&init_startup_thread, 0);
+#endif
     thread_run(startup_thread);
 
     kprintf("Starting threading system and SMP\n");

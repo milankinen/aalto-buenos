@@ -100,9 +100,43 @@ void scheduler_add_to_ready_list(TID_t t)
 	thread_table[t].next = -1;
     } else {
 	/* ready queue was not empty */
+#ifdef CHANGED_ADDITIONAL_1
+        /* changes only when queue not empty */
+        if (thread_table[t].priority == THREAD_PRIORITY_HIGH) {
+            TID_t curr, next;
+            curr = scheduler_ready_to_run.head;
+            next = thread_table[curr].next;
+            /* put to last of HIGHs
+             * if no HIGHs put first */
+            if (thread_table[curr].priority == THREAD_PRIORITY_HIGH) {
+                while ((next != -1)
+                        &&
+                        (thread_table[next].priority == THREAD_PRIORITY_HIGH)) {
+                    curr = next;
+                    next = thread_table[next].next;
+                }
+                /* now curr is last HIGH and next either first LOW or -1 */
+                thread_table[curr].next = t;
+                thread_table[t].next = next;
+                /* do not break tail */
+                if (next == -1)
+                    scheduler_ready_to_run.tail = t;
+            } else { /* curr priority LOW */
+                /* put first, that is do not break head */
+                thread_table[t].next = scheduler_ready_to_run.head;
+                scheduler_ready_to_run.head = t;
+            }
+        } else { /* priority == LOW */
+            /* put to end i.e. normal behaviour */
+            thread_table[scheduler_ready_to_run.tail].next = t;
+            thread_table[t].next = -1;
+            scheduler_ready_to_run.tail = t;
+        }
+#else
 	thread_table[scheduler_ready_to_run.tail].next = t;
 	thread_table[t].next = -1;
 	scheduler_ready_to_run.tail = t;
+#endif /* CHANGED_ADDITIONAL_1 */
     }
 }
 

@@ -60,6 +60,7 @@
 
 #include "kernel_tests/make_water.h"
 #include "kernel_tests/change_1_tests.h"
+#include "kernel_tests/canal.h"
 
 /**
  * Fallback function for system startup. This function is executed
@@ -104,6 +105,7 @@ void init_startup_fallback(void) {
 
 	DEBUG("debuginit", "Console test done, %d bytes written\n", len);
     }
+# ifdef CHANGED_1
     else if(bootargs_get("toy_probs") != NULL) {
 
     	kwrite("Running makewater test problem\n");
@@ -111,7 +113,11 @@ void init_startup_fallback(void) {
     	while(!is_water_test_finished()){
     		thread_switch();
     	}
-
+    	start_canal();
+    	while(!is_canal_test_finished()){
+    		thread_switch();
+    	}
+#endif
     } else if (bootargs_get("kernel_tests") != NULL) {
         #ifdef CHANGED_1
         kwrite("Running kernel tests for phase 1...\n");

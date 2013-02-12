@@ -140,7 +140,7 @@ void thread_table_init(void)
  * creation failed (thread table is full).
  */
 #ifdef CHANGED_ADDITIONAL_1
-TID_t thread_create(void (*func)(uint32_t), uint32_t arg, priority_t p)
+TID_t thread_create_with_priority(void (*func)(uint32_t), uint32_t arg, priority_t p)
 {
     static TID_t next_tid = 0;
     TID_t i, tid = -1;
@@ -193,7 +193,9 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg, priority_t p)
     thread_table[tid].sleeps_on    = 0;
     thread_table[tid].process_id   = -1;
     thread_table[tid].next         = -1;
+
     /* the change */
+    KERNEL_ASSERT(p == THREAD_PRIORITY_HIGH || p == THREAD_PRIORITY_NORMAL);
     thread_table[tid].priority = p;
 
     /* Make sure that we always have a valid back reference on context chain */
@@ -226,7 +228,9 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg, priority_t p)
 
     return tid;
 }
-#else
+#endif /* CHANGED_ADDITIONAL_1 */
+
+
 TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
 {
     static TID_t next_tid = 0;
@@ -281,6 +285,11 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
     thread_table[tid].process_id   = -1;
     thread_table[tid].next         = -1;
 
+    #ifdef CHANGED_ADDITIONAL_1
+    /* the change */
+    thread_table[tid].priority = THREAD_PRIORITY_NORMAL;
+    #endif /* CHANGED_ADDITIONAL_1 */
+
     /* Make sure that we always have a valid back reference on context chain */
     thread_table[tid].context->prev_context = thread_table[tid].context;
 
@@ -311,7 +320,6 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
 
     return tid;
 }
-#endif /* CHANGED_ADDITIONAL_1 */
 
 
 /** Run a thread. The given thread is added to the scheduler's

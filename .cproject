@@ -31,6 +31,7 @@
 									<listOptionValue builtIn="false" value="CHANGED_3=1"/>
 									<listOptionValue builtIn="false" value="CHANGED_4=1"/>
 									<listOptionValue builtIn="false" value="CHANGED_5=1"/>
+									<listOptionValue builtIn="false" value="CHANGED_ADDITIONAL_1=1"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1356457480" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>

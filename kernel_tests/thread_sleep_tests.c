@@ -50,6 +50,8 @@ static void wait_thread(uint32_t id) {
     lock_release(finish_lock);
 }
 
+#undef TEST_PRINT
+
 
 static void test_sleep_multi_thread(const uint32_t thread_num) {
     kprintf("Testing thread sleep with multiple simultaneous threads... \n");
@@ -90,6 +92,5 @@ void run_thread_sleep_tests() {
     test_sleep_multi_thread(5);
 }
 
-#undef TEST_PRINT
 
-#endif
+#endif /* CHANGED_1 */

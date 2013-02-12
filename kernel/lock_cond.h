@@ -8,6 +8,9 @@
 #ifdef CHANGED_1
 
 
+#define LOCK_NO_THREAD -1
+#define LOCK_RESERVED_THREAD -2
+
 /* data structures for lock_t and cond_t */
 
 typedef struct {

@@ -2,6 +2,7 @@
  * make_water.c
  */
 
+#ifdef CHANGED_1
 
 #include "kernel_tests/make_water.h"
 #include "kernel/semaphore.h"
@@ -93,3 +94,5 @@ void check_fallback(int i){
 		halt_kernel();
 	}
 }
+
+#endif /* CHANGED_1 */

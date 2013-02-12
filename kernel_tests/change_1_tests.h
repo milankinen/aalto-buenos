@@ -15,6 +15,10 @@ void run_lock_tests();
 void run_cond_tests();
 void run_thread_sleep_tests();
 
+#ifdef CHANGED_ADDITIONAL_1
+void run_thread_priority_tests();
+#endif
+
 #endif
 
 #endif /* CHANGE_1_TESTS_H_ */

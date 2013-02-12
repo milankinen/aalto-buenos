@@ -41,6 +41,20 @@ static void wait_until_threads_cond(cond_t* cond, uint32_t num) {
 }
 
 
+static void wait_until_lock_acquired(lock_t* lock) {
+    int ok_to_break = 0;
+        while(!ok_to_break) {
+            interrupt_status_t prev_status = _interrupt_disable();
+            spinlock_acquire(&lock->slock);
+            if (lock->locked_id != LOCK_NO_THREAD) {
+                ok_to_break = 1;
+            }
+            spinlock_release(&lock->slock);
+            _interrupt_set_state(prev_status);
+        }
+}
+
+
 
 static void test_basic_operations() {
     kprintf("Testing basic condition functions (no wait)... ");
@@ -88,9 +102,11 @@ static void test_wait_signal() {
     condition_signal(signal_cond, signal_lock);
     lock_release(signal_lock);
 
-    //give up remaining processor time to ensure the thread that wa
-    //waken up will proceed
-    thread_switch();
+    // we must ensure that our woken thread has acquired the lock, otherwise
+    // this test fails (there is no guarantee that the woken thread reach the
+    // acquiring code before this one if we don't ensure it)
+    wait_until_lock_acquired(signal_lock);
+
     // wait until other thread has finished
     lock_acquire(signal_lock);
     KERNEL_ASSERT(signal_test_value == orig_value + 2);

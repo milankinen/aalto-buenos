@@ -112,11 +112,12 @@ typedef struct {
 
 /* function prototypes */
 void thread_table_init(void);
-#ifdef CHANGED_ADDITIONAL_1
-TID_t thread_create(void (*func)(uint32_t), uint32_t arg, priority_t p);
-#else
 TID_t thread_create(void (*func)(uint32_t), uint32_t arg);
+
+#ifdef CHANGED_ADDITIONAL_1
+TID_t thread_create_with_priority(void (*func)(uint32_t), uint32_t arg, priority_t p);
 #endif /* CHANGED_ADDITIONAL_1 */
+
 void thread_run(TID_t t);
 
 TID_t thread_get_current_thread(void);

@@ -38,10 +38,10 @@
 # $Id: Makefile,v 1.36 2012/02/03 12:44:38 tlilja Exp $
 
 ## User configurable variables
-# NOTE: if using -DCHANGED_ADDITIONAL_1 do _not_ use kernel_tests
-# -DCHANGED_1 is required
-MODULES     := init kernel lib drivers proc vm fs net util# kernel_tests
-CHANGEDFLAGS := -DCHANGED_1 -DCHANGED_2 -DCHANGED_3 -DCHANGED_4 -DCHANGED_5 -DCHANGED_ADDITIONAL_1
+MODULES     := init kernel lib drivers proc vm fs net util kernel_tests
+CHANGEDFLAGS := -DCHANGED_1 -DCHANGED_2 -DCHANGED_3 -DCHANGED_4 -DCHANGED_5 
+# NOTE: if using -DCHANGED_ADDITIONAL_1 then -DCHANGED_1 is required
+CHANGEDADDFLAGS := -DCHANGED_ADDITIONAL_1
 PHASE        := 1
 
 ## Below this point, you shouldn't have to change anything.
@@ -53,7 +53,7 @@ UTILTARGET := util/tfstool
 CC      := mips-elf-gcc
 AS      := mips-elf-as
 LD      := mips-elf-ld
-CFLAGS  += -g -G0 -O2 -I. -Wall -W -Werror $(CHANGEDFLAGS)
+CFLAGS  += -g -G0 -O2 -I. -Wall -W -Werror $(CHANGEDFLAGS) $(CHANGEDADDFLAGS)
 LDFLAGS := --script=ld.script --cref -G0 -Map buenos.map
 ASFLAGS := -gstabs+ -I. -Wa,-mips32 $(CHANGEDFLAGS)
 # -G0 is needed to avoid GP optimization (LD won't link if it is used)

@@ -17,8 +17,6 @@
 
 /* definitions for the locks and condition variables */
 
-#define LOCK_NO_THREAD -1
-#define LOCK_RESERVED_THREAD -2
 
 
 

@@ -272,11 +272,7 @@ void pop_init()
     }
 
     /* start the service thread (the argument is a dummy) */
-#ifdef CHANGED_ADDITIONAL_1
-    pop_service_thread_id = thread_create(&pop_service_thread, 0, THREAD_PRIORITY_NORMAL);
-#else
     pop_service_thread_id = thread_create(&pop_service_thread, 0);
-#endif
     thread_run(pop_service_thread_id);
 }
 

@@ -205,6 +205,7 @@ void scheduler_add_ready(TID_t t)
 
 
 #ifdef CHANGED_1
+
 /**
  * Loops all timed sleeper threads and wakes them if their sleeping time
  * has expired. This assumes that thread_table_slock is acquired and interrupts
@@ -235,7 +236,7 @@ static void scheduler_wakeup_expired_sleepers() {
     }
 }
 
-#endif
+#endif /* CHANGED_1 */
 
 
 /**
@@ -283,16 +284,17 @@ void scheduler_schedule(void)
 
 	if(scheduler_current_thread[this_cpu] != IDLE_THREAD_TID)
 	    scheduler_add_to_ready_list(scheduler_current_thread[this_cpu]);
+
     #ifdef CHANGED_1
 	else
-	    // wake up sleeping threads whose sleeping time has elapsed
-	    // only during idle thread (this was not real-time system ;)
-	    scheduler_wakeup_expired_sleepers();
+        // wake up sleeping threads whose sleeping time has elapsed
+	    // when running idle thread (this is not real-time system)
+        scheduler_wakeup_expired_sleepers();
     #endif
+
 	current_thread->state = THREAD_READY;
 
     }
-
 
     t = scheduler_remove_first_ready();
     thread_table[t].state = THREAD_RUNNING;

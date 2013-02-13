@@ -1,0 +1,237 @@
+Phase 1 assignment documentation
+================================
+Group 3
+Lauri Hartikka, 79956E
+Jaakko Hujanen, 78842N
+Matti Lankinen, 82105H
+
+
+Assignment 1: Locks and Condition Variables
+-------------------------------------------
+
+    In this assignment locks and condition variables were implemented.
+    The function prototypes are found in kernel/lock_cond.h and implementation
+    is in kernel/lock_cond.c. The following files were changed in the process.
+
+    Changed files:
+        - init/main.c
+        - kernel/config.h
+        - kernel/lock_cond.c
+        - kernel/lock_cond.h
+        - kernel/thread.c
+        - kernel/thread.h
+
+    In the solution locks and condition variables are held in memory as tables
+    similar to thread_table. These tables are allocated in the initialization of
+    the OS. The data structures were defined as follows:
+
+    lock_t type:
+        - A spinlock to ensure proper synchronization. The spinlock also
+          serves as a resource for sleep queue.
+        - TID of the thread which acquired the lock.
+        - A variable used to make re-entrant locking work.
+        - A variable to keep track how many threads are waiting to
+          obtain the lock.
+        - A variable to indicate whether the lock is in use. This is needed
+          for the static allocation of the locks.
+          
+    cond_t type:
+        - A spinlock with identical role to the spinlock of lock_t.
+        - A variable to keep track how many threads are waiting for
+          this condition.
+        - As for lock_t: variable to indicate whether the condition variable
+          is in use. This is needed for the static allocation of the locks.
+          
+    Next, notes on the implementation are provided. When the operating system
+    starts. Allocate static tables for locks and condition variables. Creating
+    is then done by finding unused entries from the tables. In the 
+    initialization spinlocks are reseted and variables initialized to their
+    defaults. The tables are protected by spinlocks created for the tables.
+                                                      
+   Creating a lock:                                  
+        - Find unused entry of lock table. Then return the address of the
+          entry found. The whole operation is protected by disabling 
+          interrupts and by the spinlock of the lock table.
+    Destroying a lock:
+        - Set lock unused. The whole operation is protected by disabling
+          interrupts and spinlocks of the lock and the lock table. Only
+          open locks can be destroyed.
+    Acquiring a lock:
+        - Enter critical region by disabling interrupts and acquiring a
+          spinlock.
+        - If there is no one using the lock update the user of the lock,
+          initialize the required field. Return interrupts, release
+          the spinlock and return.
+        - If the lock is used by the same thread already holding the lock
+          (re-entrant locking) update the variable responsible for
+          re-entrant locking and return after returning interrupts and
+          releasing the spinlock.
+        - Here, the thread has to be put to sleep. Update the amount of
+          waiting threads before pushing the thread to sleep queue. Then
+          release the spinlock and switch thread.
+        - After waking up acquire the spinlock and decrease the amount of
+          waiting threads. Set the thread holding the lock to this thread.
+          Reinitialize needed variables and release spinlock before returning.
+          The lock is now acquired.
+    Release a lock:
+        - Synchronize with spinlock of the lock. Interrupts are disabled too.
+        - Assert that thread releasing the lock is the same thread holding the
+          lock.
+        - If the lock has been re-entered update the corresponding variable
+          and do nothing. Return interrupts and release the spinlock.
+        - If there are threads waiting wake one from the sleep queue of the
+          spinlock of the lock (resource). Set lock owning thread to a special
+          value to avoid jumping the sleep queue. Return interrupts and release
+          the spinlock.
+        - If none of the above there are no threads in queue set lock free to
+          be acquired. Again return and release interrupts and the spinlock.
+
+   Creating a Condition variable:
+        - Similarly to lock
+    Destroying a Condition variable:
+        - Similarly to lock
+    Waiting on a condition variable:
+        - As before, the interrupts are disabled and the spinlock of the
+          condition variable is acquired to provide synchronization.
+          They are enabled/released when the function returns.
+        - Put the thread in the sleeping queue update the amount of
+          waiting threads variable. After releasing the spinlock and the
+          lock given as argument, switch thread.
+        - When signaled acquire the argument lock back and return.
+    Signal a condition variable:
+        - Again, acquire the spinlock of the condition variable after
+          disabling interrupts.
+        - If there are threads waiting wake one and update the value of
+          waiting threads.
+        - Return the interrupts and release the spinlock.
+    Signal a condition variable:
+        - Again, acquire the spinlock of the condition variable after
+          disabling interrupts.
+        - If there are threads waiting wake all and set amount of waiting
+          threads to 0.
+        - Return the interrupts and release the spinlock.
+
+Design was not changed since the review session.
+
+
+Assignment 2: Toy prob. canal
+------------------------------
+
+Modified files: 
+    -kernel_tests/canal.c
+    -kernel_tests/canal.h 
+
+The canal logic follows the following rules:
+    - A boat will not enter the canal if the canal is not empty and the
+      direction is not favourable
+    - If the canal is empty when the boat arrives the direction of the
+      canal is changed according the entering boat
+    - If the canal is empty after a boat leaves the canal the direction
+      of the canal is changed and the boats waiting for the direction to be
+      changed are encouraged to enter
+    - To avoid starvation a boat will not enter the canal even the direction
+      would be favourable if a fixed number of boats have already exited the
+      canal in the current direction.
+
+How the canal uses locks and condition variables:
+    There are only one lock. Each boat acquires the lock when entering or
+    exiting the canal thus only one boat can make decisions regarding the
+    direction at given time. Condition broadcasts are used to wake up the
+    boats waiting for the direction to change. The two condition variables
+    goWest and goEast bound to the directions.
+
+No design changes were made regarding the review session.
+
+
+Assignment 3: Thread sleep
+---------------------------
+
+Modified files:
+  - kernel/scheduler.c
+  - kernel/thread.c
+  - kernel/thread.h
+
+Steps done for the assignment:
+1) Modify thread memory struct so that it has following additional fields
+  - next_sleeper_id : points to the next sleeper thread (linked list)
+  - wakeup_time : system time in millisecs when the thread should be woken up
+    (value 0 indicates that thread is not sleeping)
+  - remember to decrement dummy alignment fill!
+2) Add global variables:
+  - thread_next_sleeper_id : index to the “sleeper queue” top
+    (next waking) thread, if no threads sleeping, then value is -1
+3) Modify thread table initialization function
+  - set global linked list top to -1 (no sleepers)
+  - set theads’ next_sleeper_id = -1 (no linking) and
+    wakeup_time = 0 (not sleeping)
+4) Add function: void thread_sleep(uint32_t sleep_time_in_milliseconds);
+  a) locks the thread_table spinlock
+  b) calculates the system time when the thread should wake up
+  c) inserts the thread to our linked list so that the linked list is
+     ordered: first waking thread is ALWAYS first
+  d) release thread table spinlock
+  e) switch context
+5) Modify scheduler_schedule (note that thread table spinlock is locked
+   already) function so that it performs also following operations:
+  a) check if running thread has wakeup_time != 0
+   --> put that thread to THREAD_SLEEPING mode
+  b) if running *idle thread* the try to wake up “sleepers”:
+    i) check that the global thread_next_sleeper_id != -1 (we have sleepers)
+    ii) loop the linked list and compare “sleeper thread” wakeup times
+    iii) if current time is more that wakeup time, then put thread to
+         THREAD_READY mode and push into scheduler’s ready queue
+    iv) if thread is woken up, then remove it from the linked list and set
+        list head to point the next “sleeper”
+    v) repeat until we found thread that is not ready for wakeup or linked
+       list is empty
+
+We are using idle thread to wake up our sleeping thread because we don’t
+want to stress the execution of actual worker threads too much; real-time
+system wasn’t required so the sleeping delay may be bigger than the given
+value.
+
+We are using ordered linked list because the amount of (sleeping) thread
+cannot be assured: huge amount of threads could cause performance hits for our
+linked list looping. In addition, the ordering reduces the complexity in our
+thread_sleep method and scheduler functions.
+
+
+Assignment 4: Toy prob. water
+------------------------------
+
+Modified files:
+-kernel_tests/make_water.c
+-kerne_tests/make_water.c
+
+Oxygen is responsible for creating the water molecules. Hydrogens only inform
+their availability to the water making process via semaphores and then waits
+to be consumed.
+
+There are two semaphores: hydrogensWaiting and hydrogensReady.
+The hydrogensReady will act as a counter for the oxygen atom to know the are
+hydrogens to be consumed. The oxygen signals respectively two times the
+hydrogensWaiting semaphore in order to finally terminate the hydrogen()
+function calls.
+
+In order to ensure that a water molecule will be created always when there is
+enough resources only one oxygen can be creating a new water molecule at a
+given time. This is handled with a simple mutex.
+
+
+Additional Assignment 5: Priority Scheduling
+--------------------------------------------------------
+
+Changed files:
+- init/main.c
+- kernel/scheduler.c
+- kernel/thread.c
+- kernel/thread.h
+
+In the implementation of priorities thread table was changed to contain new
+field priority which takes two values for normal and high priority.
+In kernel/scheduler.c scheduler_add_to_ready_list function was modified to add
+high priority threads in front of low priority ones. Also thread_create
+function was updated to take new argument, priority. This function was named
+as thread_create_with_priority and the original function was left as it was.
+
+No design changes were made regarding the review session.

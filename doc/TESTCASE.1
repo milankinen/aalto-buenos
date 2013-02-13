@@ -1,0 +1,139 @@
+Phase 1 testcase documentation
+===============================
+Group 3
+Lauri Hartikka, 79956E
+Jaakko Hujanen, 78842N
+Matti Lankinen, 82105H
+
+
+Running tests
+==============
+- Run tests for kernel modifications:
+     yams buenos kernel_tests
+- Run toy problems:
+     yams buenos toy_probs
+     (both water and canal tests will be ran)
+
+
+
+Test cases
+===========
+
+All phase 1 testcases are categorized into functions and all function
+declarations are in file ‘kernel_tests/change_1_tests.h’ which is
+included in ‘kernel/main.c’. Each function call runs all tests for a
+certain category (described below).
+
+
+Lock tests (kernel_tests/lock_tests.c)
+-------------------------------------
+
+1) test_acquire_release()
+This test case just checks that lock operations (create, acquire, release,
+destroy) doesn’t cause kernel panics or unexpected crashes.
+
+2) test_destroy_resource_free()
+This test case checks that lock destroy function releases lock resources
+for next user. Test is performed by creating and destroying lock instances
+sequentically more times than the system has locks.
+
+3) test_reentrant()
+This test case ensures the re-entrant (nested) locking behaviour. It’s
+implemented in white-box testing: every time when nested lock is acquired,
+nested_locking_count variable should increment. Every time when lock is
+released then variable should decrement. Test ensures that lock ownership
+remains during re-entrant acquires and releases.
+
+4) test_critical_and_fairness()
+This test case ensures that
+ - lock acquiring ensures the protection of our critical section
+ - queued threads are treated faily when they acquire the lock after previous
+ release
+Tests are implemented in white-box testing: “n” threads are created
+and run and they are synchronized with low-level spinlocks so that their
+lock_acquire reaching order is known. The main thread acquires the lock first
+and instruments the test case: when all threads have reached the acquiring
+point, then lock is released. The hypothesis is that each thread should reach
+the critical section fairly: they assert that they have reached that section
+in right order and increment a counter which indicates the reaching order
+(so that next threads can assert their order). Main thread waits until all
+assertions are done and threads finished.  
+
+5) test_interrupt_preserving()
+This test case ensures that all locking functions (lock_create, lock_acquire,
+lock_relase and lock_destroy) preserves the interrupt state. Test case
+includes testing for different lock acquiring/releasing situations:
+ - acquire lock that is not acquired,
+ - acquire lock that is already acquired,
+ - release lock that has no threads waiting,
+ - relase lock that has threads waiting.
+Test functions take the interrupt state before and after the operations and
+asserts that those are equal.
+
+
+Condition tests (kernel_tests/cond_tests.c)
+-------------------------------------------
+
+1) test_basic_operations()
+This test case just checks that condition variable operations (create, signal,
+broadcast, destroy) doesn’t cause kernel panics or unexpected crashes.
+
+2) test_wait_signal()
+This test case ensures that
+ - cond_wait puts the thread to the sleep and releases acquired lock
+ - signaling wakes the sleeping thread (which tries to acquire lock again)
+Test is implemented in white-box style: the main thread is “signaler”
+which start a wait thread and waits (with spinlocks) that the wait thread
+has acquired the lock and gone to sleep (thus releasing the lock). This is
+ensured with kernel asserts and global test variable. After that, the main
+thread acquires condition lock and signals the waiting thread. Test variable
+is incremented between those operations and the new value is asserted until
+waiting thread acquires the lock again. When waiting thread acquires lock,
+it increments the test variable, releases the lock and terminates. Main
+thread tries to acquire lock and asserts that our “waiting thread” has
+increment the test variable again.
+
+3) test_broadcast()
+Several threads are put to wait for a condition signal. A broadcast call is
+made and it is ensured that all the threads are waken.
+
+4) test_signal_release_order()
+Tests that when signaling the condition variables the condition variables
+waiting to be signaled are released in the same order as the threads were
+put to sleep because of the condition variables.
+
+Thread sleep tests (kernel_tests/thread_sleep_tests.c)
+------------------------------------------------------
+
+1) test_sleep_500_ms()
+This test performs a sleep of 500 ms and asserts that at least the defined
+time is elapsed when thread wakes up from the sleep.
+
+2) test_sleep_multi_thread()
+This test performs a sleep for multiple thread simultaneously. Each thread
+sleeps a pseudo-random time amount and assert that the slept time is at
+least the defined one. This test also ensures, that our sleeper linked list
+handling works as expected:
+  - linking is corrected when another thread wakes up
+  - only those threads are woken up whose wakeup time has elapsed
+
+
+
+Toy problem tests
+==================
+
+1) start_canal() (kernel_tests/canal.c)
+Starts the canal tests. Boats are passed to the canal with the fixed intervals
+and directions. The thread_sleep property is used when feeding the boats to
+the canal. In the end it is checked that all the boats gets out of the canal.
+
+In the second scenario starvation is tested by passing in some boats with
+the same direction but there is one boat requesting to different direction
+somewhere in the middle.
+
+2) start_make_water() (kernel_tests/make_water.c)
+Starts the tests for the water problem. A fixed number of hydrogen and
+oxygen threads are spawned and the number of created water molecyles are
+checked. The test also ensured that a water is always created if the minimum
+number of the required atoms are present.
+

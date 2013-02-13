@@ -36,7 +36,7 @@ uint32_t threads_finished;
 
 static void wait_thread(uint32_t id) {
     uint32_t s, w, f;
-    w = _get_rand(500);
+    w = _get_rand(1500);
     s = rtc_get_msec();
 
     TEST_PRINT("Thread %d: waiting %d ms\n", id, w);
@@ -89,7 +89,7 @@ static void test_sleep_multi_thread(const uint32_t thread_num) {
 
 void run_thread_sleep_tests() {
     test_sleep_500_ms();
-    test_sleep_multi_thread(5);
+    test_sleep_multi_thread(10);
 }
 
 

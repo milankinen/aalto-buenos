@@ -79,6 +79,8 @@ void process_start(const char *executable)
 
     my_entry = thread_get_current_thread_entry();
 
+    //kprintf("ASDASDASDDSA %d\n", thread_get_current_thread());
+
     /* If the pagetable of this thread is not NULL, we are trying to
        run a userland process for a second time in the same thread.
        This is not possible. */

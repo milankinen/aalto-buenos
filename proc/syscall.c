@@ -39,6 +39,7 @@
 #include "kernel/panic.h"
 #include "lib/libc.h"
 #include "kernel/assert.h"
+#include "kernel/thread.h"
 
 /**
  * Handle system calls. Interrupts are enabled when this function is
@@ -60,6 +61,7 @@ void syscall_handle(context_t *user_context)
      */
     switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
     case SYSCALL_HALT:
+        //kprintf("QWEQWEQ %d\n", thread_get_current_thread());
         halt_kernel();
         break;
     default: 

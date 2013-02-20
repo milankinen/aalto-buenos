@@ -61,7 +61,6 @@ void syscall_handle(context_t *user_context)
      */
     switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
     case SYSCALL_HALT:
-        //kprintf("QWEQWEQ %d\n", thread_get_current_thread());
         halt_kernel();
         break;
     default: 

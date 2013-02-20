@@ -7,6 +7,8 @@
 
 #ifdef CHANGED_1
 
+#include "kernel/spinlock.h"
+#include "kernel/thread.h"
 
 #define LOCK_NO_THREAD -1
 #define LOCK_RESERVED_THREAD -2

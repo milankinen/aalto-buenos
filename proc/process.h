@@ -37,7 +37,12 @@
 #ifndef BUENOS_PROC_PROCESS
 #define BUENOS_PROC_PROCESS
 
+
 typedef int process_id_t;
+
+#ifdef CHANGED_2
+typedef process_id_t PID_t;
+#endif
 
 void process_start(const char *executable);
 

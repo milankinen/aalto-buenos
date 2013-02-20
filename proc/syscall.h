@@ -37,6 +37,93 @@
 #ifndef BUENOS_PROC_SYSCALL
 #define BUENOS_PROC_SYSCALL
 
+
+#ifdef CHANGED_2
+
+#include "proc/process.h"
+#include "proc/process_table.h"
+#include "fs/vfs.h"
+
+/**
+ * Reads the system call string parameter (from process) to a given memory address.
+ * This method performs conversions from virtual address to physical address and vice versa.
+ *
+ * @param pagetable Page table for virtual address conversions.
+ * @param virtual_source
+ *         Pointer to a VIRTUAL MEMORY address of calling process, which contains the
+ *         source string from caller process. (This points to the first character and terminates
+ *         to '\0')
+ * @param physical_target
+ *         Pointer to a PHYSICAL address where the readed string is stored. Kernel code
+ *         must allocate memory for this data.
+ * @param max_length
+ *         Maximum length which can be readed to the target_string parameter.
+ */
+void read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
+        char* physical_target, uint32_t max_length);
+
+/**
+ * Reads the system call provided data (from process) to a given memory adress.
+ * This method performs conversions from virtual address to physical address and vice versa.
+ *
+ * @param pagetable Page table for virtual address conversions.
+ * @param virtual_source
+ *        Pointer to a VIRTUAL MEMORY address of calling process, which contains the
+ *        source data.
+ * @param physical_target
+ *        Pointer to a PHYSICAL address where the readed source data is stored. Kernel code
+ *        must ensure that it's allowed to write the given size to this memory block.
+ * @params size
+ *        Number of bytes to read.
+ */
+void read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
+        void* physical_target, uint32_t size);
+
+/**
+ * Writes the given data block to the processes
+ * This method performs conversions from virtual address to physical address and vice versa.
+ *
+ * @param pagetable Page table for virtual address conversions.
+ * @param physical_source
+ *        Pointer to a PHYSICAL address where the source data is readed.
+ * @param virtual_target
+ *        Pointer to a VIRTUAL MEMORY address of calling process, which contains the target
+ *        address where written data is stored.
+ * @params size
+ *        Number of bytes to write.
+ */
+void write_data_to_vm(pagetable_t* pagetable, const void* physical_source,
+        void* virtual_target, uint32_t size);
+
+
+
+/* SYSCALL HANDLER DEFINITIONS */
+
+PID_t syscall_handle_exec(const char *filename);
+
+void syscall_handle_exit(int retval);
+
+int syscall_handle_join(PID_t pid);
+
+openfile_t syscall_handle_open(const char *filename);
+
+int syscall_handle_close(openfile_t filehandle);
+
+int syscall_handle_seek(openfile_t filehandle, int offset);
+
+int syscall_handle_read(openfile_t filehandle, void *buffer, int length);
+
+int syscall_handle_write(openfile_t filehandle, const void *buffer, int length);
+
+int syscall_handle_create(const char *filename, int size);
+
+int syscall_handle_delete(const char *filename);
+
+
+#endif /* CHANGED_2 */
+
+
+
 /* Syscall function numbers. You may add to this list but do not
  * modify the existing ones.
  */
@@ -53,6 +140,8 @@
 #define SYSCALL_WRITE 0x205
 #define SYSCALL_CREATE 0x206
 #define SYSCALL_DELETE 0x207
+
+
 
 /* When userland program reads or writes these already open files it
  * actually accesses the console.

@@ -50,4 +50,28 @@ void vm_unmap(pagetable_t *pagetable, uint32_t vaddr);
 
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty);
 
+#ifdef CHANGED_2
+
+/**
+ * Gets physical and virtual page start offsets from given virtual address and pagetable.
+ * This function should be called only after pagetable is properly filled.
+ *
+ * @param pagetable
+ *          Page table where the offsets are fetched.
+ * @param vaddr
+ *          Virtual address whose page offsets are checked.
+ * @param p_physpageoff
+ *          Pointer where the fetched physical page offset is placed. Set to 0 if virtual address
+ *          doesn't belong to given page table.
+ * @param p_virtpageoff
+ *          Pointer where the fetched virtual page offset is placed. Set to 0 if virtual address
+ *          doesn't belong to given page table.
+ * @returns
+ *          1 if virtual address belongs to the given page table. 0 if not.
+ */
+int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
+        uint32_t* p_physpageoff, uint32_t* p_virtpageoff);
+
+#endif /* CHANGED_2 */
+
 #endif /* BUENOS_VM_VM_H */

@@ -207,6 +207,42 @@ void vm_map(pagetable_t *pagetable,
     pagetable->valid_count++;
 }
 
+
+#ifdef CHANGED_2
+int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
+        uint32_t* p_physpageoff, uint32_t* p_virtpageoff) {
+    uint32_t i;
+    int found = 0;
+    *p_physpageoff = 0;
+    *p_virtpageoff = 0;
+
+    if (pagetable) {
+        for(i=0; i<pagetable->valid_count; i++) {
+            if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+                /* TLB has separate mappings for even and odd
+                   virtual pages. Let's handle them separately here,
+                   and we have much more fun when updating the TLB later.*/
+                if(ADDR_IS_ON_EVEN_PAGE(vaddr) && pagetable->entries[i].V0) {
+                    *p_physpageoff = pagetable->entries[i].PFN0;
+                    // TODO: shift vpn?
+                    *p_virtpageoff = pagetable->entries[i].VPN2;
+                    found = 1;
+                    break;
+                } else if (pagetable->entries[i].V1 == 1) {
+                    *p_physpageoff = pagetable->entries[i].PFN1;
+                    // TODO: shift vpn?
+                    *p_virtpageoff = pagetable->entries[i].VPN2;
+                    found = 1;
+                    break;
+                }
+
+            }
+        }
+    }
+    return found;
+}
+#endif
+
 /**
  * Unmaps given virtual address from given pagetable.
  *

@@ -24,7 +24,7 @@ extern process_table_t process_table[CONFIG_MAX_PROCESSES];
 static void new_process_thread(uint32_t dataptr) {
     child_process_create_data_t* dat;
     dat = (child_process_create_data_t*)dataptr;
-
+    process_start(dat->filename, dat);
 }
 
 

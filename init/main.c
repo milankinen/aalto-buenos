@@ -58,6 +58,10 @@
 #include "proc/process.h"
 #include "vm/vm.h"
 
+#ifdef CHANGED_2
+#   include "proc/process_table.h"
+#endif
+
 #include "kernel_tests/make_water.h"
 #include "kernel_tests/change_1_tests.h"
 #include "kernel_tests/canal.h"
@@ -163,7 +167,11 @@ void init_startup_thread(uint32_t arg)
 
     kprintf("Starting initial program '%s'\n", bootargs_get("initprog"));
 
+#ifdef CHANGED_2
+    process_start(bootargs_get("initprog"), NULL);
+#else
     process_start(bootargs_get("initprog"));
+#endif
 
     /* The current process_start() should never return. */
     KERNEL_PANIC("Run out of initprog.\n");
@@ -250,6 +258,11 @@ void init(void)
 
     kwrite("Initializing virtual memory\n");
     vm_init();
+
+#ifdef CHANGED_2
+    kwrite("Initializing process table\n");
+    process_table_init();
+#endif
 
     kprintf("Creating initialization thread\n");
 #ifdef CHANGED_ADDITIONAL_1

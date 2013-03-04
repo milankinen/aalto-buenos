@@ -44,6 +44,13 @@
 #include "proc/process_table.h"
 #include "fs/vfs.h"
 
+/** Return values for internal helpers */
+#define RETVAL_SYSCALL_HELPERS_NOK -1
+#define RETVAL_SYSCALL_HELPERS_OK 1
+
+/* Return value for userland when system call fails but doesn't kill process */
+#define RETVAL_SYSCALL_USERLAND_NOK -1
+
 /**
  * Reads the system call string parameter (from process) to a given memory address.
  * This method performs conversions from virtual address to physical address and vice versa.
@@ -59,8 +66,8 @@
  * @param max_length
  *         Maximum length which can be readed to the target_string parameter.
  */
-void read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
-        char* physical_target, uint32_t max_length);
+int read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
+        char* physical_target, int max_length);
 
 /**
  * Reads the system call provided data (from process) to a given memory adress.
@@ -76,8 +83,8 @@ void read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
  * @params size
  *        Number of bytes to read.
  */
-void read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
-        void* physical_target, uint32_t size);
+int read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
+        void* physical_target, int size);
 
 /**
  * Writes the given data block to the processes
@@ -92,14 +99,14 @@ void read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
  * @params size
  *        Number of bytes to write.
  */
-void write_data_to_vm(pagetable_t* pagetable, const void* physical_source,
-        void* virtual_target, uint32_t size);
+int write_data_to_vm(pagetable_t* pagetable, const void* physical_source,
+        void* virtual_target, int size);
 
 
 
 /* SYSCALL HANDLER DEFINITIONS */
 
-PID_t syscall_handle_exec(const char *filename);
+PID_t syscall_handle_execp(const char *filename, int argc, char** argv);
 
 void syscall_handle_exit(int retval);
 

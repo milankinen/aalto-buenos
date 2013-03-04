@@ -51,6 +51,101 @@
  * This module contains a function to start a userland process.
  */
 
+
+#ifdef CHANGED_2
+
+#include "proc/process_table.h"
+
+
+process_table_t process_table[CONFIG_MAX_PROCESSES];
+lock_t* process_table_lock;
+
+
+static void free_process_table_entry(process_table_t* entry) {
+    entry->tid                = PROCESS_NO_OWNER_TID;
+    entry->parent_pid         = PROCESS_NO_PARENT_PID;
+    entry->next               = PROCESS_NO_PARENT_PID;
+    entry->last_child_pid     = PROCESS_NO_PARENT_PID;
+    entry->retval             = PROCESS_NO_RETVAL;
+}
+
+void process_table_init() {
+    size_t i;
+    interrupt_status_t stat;
+    stat = _interrupt_disable();
+    process_table_lock = lock_create();
+    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
+        free_process_table_entry(process_table + i);
+        process_table[i].die_lock           = lock_create();
+        process_table[i].die_cond           = condition_create();
+    }
+    _interrupt_set_state(stat);
+}
+
+
+
+PID_t get_current_process_pid() {
+    // we can loop table without lock because we are in read-only state and
+    // entry's "tid" doesn't change during read
+    PID_t found = PROCESS_NO_PARENT_PID;
+    TID_t tid;
+    uint32_t i;
+    interrupt_status_t stat = _interrupt_disable();
+    tid = thread_get_current_thread();
+    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
+        if (process_table[i].tid == tid && tid != PROCESS_NO_OWNER_TID) {
+            found = (PID_t)i;
+            break;
+        }
+    }
+    _interrupt_set_state(stat);
+    return found;
+}
+
+process_table_t* get_current_process_entry() {
+    // we can loop table without lock because we are in read-only state and
+    // entry's "tid" doesn't change during read
+    process_table_t* found = NULL;
+    TID_t tid;
+    uint32_t i;
+    interrupt_status_t stat = _interrupt_disable();
+    tid = thread_get_current_thread();
+    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
+        if (process_table[i].tid == tid && tid != PROCESS_NO_OWNER_TID) {
+            found = process_table + i;
+            break;
+        }
+    }
+    _interrupt_set_state(stat);
+    return found;
+}
+
+
+
+static void restore_process_state(child_process_create_data_t* data, process_table_t* entry) {
+    interrupt_status_t intr_stat;
+    process_table_t* parent_entry;
+    if (entry != NULL) {
+        intr_stat = _interrupt_disable();
+        // process table entry has been created, we must free it
+        free_process_table_entry(entry);
+        _interrupt_set_state(intr_stat);
+    }
+    if (data != NULL) {
+        parent_entry = process_table + data->parent_pid;
+        data->ready = 1;
+        // we have parent process waiting, we must inform the failure to our parent
+        condition_signal(parent_entry->die_cond, parent_entry->die_lock);
+        lock_release(parent_entry->die_lock);
+    }
+}
+
+#endif
+
+
+
+
+
 /**
  * Starts one userland process. The thread calling this function will
  * be used to run the process and will therefore never return from
@@ -63,7 +158,11 @@
  * @executable The name of the executable to be run in the userland
  * process
  */
+#ifdef CHANGED_2
+void process_start(const char *executable, child_process_create_data_t* data)
+#else
 void process_start(const char *executable)
+#endif
 {
     thread_table_t *my_entry;
     pagetable_t *pagetable;
@@ -76,6 +175,66 @@ void process_start(const char *executable)
     int i;
 
     interrupt_status_t intr_status;
+
+#ifdef CHANGED_2
+    char** argv;
+    char* virtual_argv[CONFIG_SYSCALL_MAX_ARGC];
+    int argc;
+    PID_t parent_pid, my_pid;
+    process_table_t* parent_proc_entry;
+    process_table_t* my_proc_entry;
+    int arglen;
+
+    my_pid = PROCESS_NO_PARENT_PID;
+    my_proc_entry = NULL;
+    if (data != NULL) {
+        argc = data->argc;
+        argv = data->argv;
+        parent_pid = data->parent_pid;
+        parent_proc_entry = process_table + parent_pid;
+        // parent process is waiting until child is created
+        lock_acquire(parent_proc_entry->die_lock);
+    } else {
+        argc = 0;
+        argv = NULL;
+        parent_pid = PROCESS_NO_PARENT_PID;
+        parent_proc_entry = NULL;
+    }
+
+    intr_status = _interrupt_disable();
+    lock_acquire(process_table_lock);
+
+    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
+        if (process_table[i].tid == PROCESS_NO_OWNER_TID &&
+                process_table[i].parent_pid == PROCESS_NO_PARENT_PID) {
+            // found a free process entry, fill it properly
+            my_proc_entry                   = process_table + i;
+            my_proc_entry->tid              = thread_get_current_thread();
+            my_proc_entry->parent_pid       = parent_pid;
+            my_proc_entry->next             = PROCESS_NO_PARENT_PID;
+            my_proc_entry->last_child_pid   = PROCESS_NO_PARENT_PID;
+            my_proc_entry->retval           = PROCESS_NO_RETVAL;
+            stringcopy(my_proc_entry->name, "foobar", PROCESS_NAME_MAX_LENGTH);
+            my_pid = (PID_t)i;
+            if (parent_proc_entry != NULL) {
+                // correct child process linked list
+                if (parent_proc_entry->last_child_pid != PROCESS_NO_PARENT_PID) {
+                    my_proc_entry->next = parent_proc_entry->last_child_pid;
+                }
+                parent_proc_entry->last_child_pid = my_pid;
+            }
+            break;
+        }
+    }
+
+    lock_release(process_table_lock);
+    _interrupt_set_state(intr_status);
+
+    if (my_proc_entry == NULL) {
+        // no free process entries found, restore state and release possible locks
+        restore_process_state(data, my_proc_entry);
+    }
+#endif
 
     my_entry = thread_get_current_thread_entry();
 
@@ -182,6 +341,36 @@ void process_start(const char *executable)
     memoryset(&user_context, 0, sizeof(user_context));
     user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
     user_context.pc = elf.entry_point;
+
+#ifdef CHANGED_2
+
+    // add main arguments
+    for (i = 0 ; i < argc ; i++) {
+        arglen = strlen(argv[i]) + 1;
+        // reserve space from stack
+        user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
+        // copy our string to it
+        memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), argv[i]);
+        virtual_argv[i] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
+    }
+    // construct char**
+    for (i = argc - 1 ; i >= 0 ; i++) {
+        // reserve space from stack
+        user_context.cpu_regs[MIPS_REGISTER_SP] -= sizeof(uint32_t);
+        // write argument address to space
+        memcopy(sizeof(uint32_t), (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), virtual_argv + i);
+    }
+    user_context.cpu_regs[MIPS_REGISTER_A0] = argc;
+    user_context.cpu_regs[MIPS_REGISTER_A1] = argc > 0 ? user_context.cpu_regs[MIPS_REGISTER_SP] : 0;
+
+    if (data != NULL) {
+        // all ok, let parent process to resume
+        data->child_pid = my_pid;
+        data->ready = 1;
+        condition_signal(parent_proc_entry->die_cond, parent_proc_entry->die_lock);
+        lock_release(parent_proc_entry->die_lock);
+    }
+#endif
 
     thread_goto_userland(&user_context);
 

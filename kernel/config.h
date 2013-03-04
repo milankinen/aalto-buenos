@@ -47,6 +47,15 @@
 #   define CONFIG_MAX_CONDITION_VARIABLES 128
 #endif
 
+#ifdef CHANGED_2
+/* Maximum number of simultaneous processes. */
+#   define CONFIG_MAX_PROCESSES 32
+/* Maximum length that can be given as a string parameter to a systemcall or as a read/write buffer. */
+#   define CONFIG_SYSCALL_MAX_BUFFER_SIZE 512
+/* Maximum string parameter number for execp */
+#   define CONFIG_SYSCALL_MAX_ARGC 32
+#endif
+
 
 /* Size of the stack of a kernel thread */
 #define CONFIG_THREAD_STACKSIZE 4096

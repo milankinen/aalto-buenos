@@ -41,10 +41,41 @@
 typedef int process_id_t;
 
 #ifdef CHANGED_2
+
+/** This constant indicates that process has no parent. */
+#define PROCESS_NO_PARENT_PID -1
+/** This constant indicates that process has no owner thread so it is not in the execution atm. */
+#define PROCESS_NO_OWNER_TID -1
+/** This constant indicates that process has not exited yet. */
+#define PROCESS_NO_RETVAL -1
+
+
 typedef process_id_t PID_t;
-#endif
+
+/**
+ * This struct is passed as an pointer to created child process. And it transfers
+ * all needed data for execp syscall.
+ */
+typedef struct {
+    PID_t parent_pid;
+    PID_t child_pid;
+    int ready;
+    const char* filename;
+    int argc;
+    char** argv;
+} child_process_create_data_t;
+
+
+void process_start(const char *executable, child_process_create_data_t* data);
+
+
+#else
 
 void process_start(const char *executable);
+
+#endif
+
+
 
 #define USERLAND_STACK_TOP 0x7fffeffc
 

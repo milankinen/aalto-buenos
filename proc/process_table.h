@@ -54,6 +54,13 @@ typedef struct {
 
 } process_table_t;
 
+
+
+void process_table_init();
+
+PID_t get_current_process_pid();
+process_table_t* get_current_process_entry();
+
 #endif
 
 

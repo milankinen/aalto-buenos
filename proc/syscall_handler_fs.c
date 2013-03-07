@@ -39,12 +39,14 @@ int syscall_handle_read(openfile_t filehandle, void *buffer, int length) {
 int syscall_handle_write(openfile_t filehandle, const void *buffer, int length) {
     // TODO: implementation
     filehandle = filehandle;
+    length = length;
     length = *((const int*)buffer);
     return 0;
 }
 
 int syscall_handle_create(const char *filename, int size) {
     // TODO: implementation
+    size = size;
     size = *((const int*)filename);
     return 0;
 }

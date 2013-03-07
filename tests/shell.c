@@ -20,9 +20,16 @@
 typedef struct {
     /* number of arguments */
     int argc;
-    /* null ended strings in null ended array
+    /* pointers for the 2-dim array below
+     * this is null ended
+     * used as a wrapper for arga to give smoother typecast
+    */
+    char *argv[SHELL_ARGUMENT_ARRAY_LEN];
+    /* _not_ null ended array! this should only be accessed from argv
+     * each string in arga[something] _is_ however null ended
+     * this is used for strings and argv is used to feed execp
      */
-    char argv[SHELL_ARGUMENT_ARRAY_LEN][SHELL_ARGUMENT_STRING_LEN];
+    char arga[SHELL_ARGUMENT_ARRAY_LEN][SHELL_ARGUMENT_STRING_LEN];
 } shell_cmd;
 
 /* data structure to hold shell status
@@ -45,6 +52,18 @@ typedef struct {
 } shell_status;
 
 /* auxiliary functions */
+
+void
+shell_init(shell_cmd *cmd, shell_status *status) {
+    /* set argv to correspond to the 2-dim array arga */
+    int i;
+    for (i = 0; i < SHELL_ARGUMENT_ARRAY_LEN-1; i++)
+        cmd->argv[i] = cmd->arga[i];
+    /* null ending */
+    cmd->argv[i] = 0;
+    /* no errors yet */
+    status->error = OK;
+}
 
 /* print_str: print c string */
 void
@@ -134,8 +153,7 @@ shell_parse(shell_cmd *cmd, shell_status *status) {
         status->error = READFAIL;
         return;
     }
-    else
-        status->error = OK;
+    /* error is left OK since it was initialized in shell_init */
     /* check if EOF was encountered */
     if (cmdln-end == 0) {
         cmd = 0;
@@ -157,10 +175,10 @@ shell_parse(shell_cmd *cmd, shell_status *status) {
         for (j = 0; next_nonwhite + j < next_white; j++) {
             if (j >= SHELL_ARGUMENT_STRING_LEN) {
                 status->error = ARGLENFAIL;
-                cmd->argv[i][j-1] = '\0';
+                cmd->arga[i][j-1] = '\0';
                 goto break_both_loops;
             }
-            cmd->argv[i][j] = next_nonwhite[j];
+            cmd->arga[i][j] = next_nonwhite[j];
         }
         next_nonwhite = shell_next_nonwhite(next_white, end);
         if (next_nonwhite == end)
@@ -175,14 +193,14 @@ shell_parse(shell_cmd *cmd, shell_status *status) {
         /* the array is not null ended any more
          * correct that for robustness
          */
-        cmd->argv[i-1] = 0; /* FIXME */
+        cmd->argv[i-1] = 0;
         return;
     }
     /* now all arguments are in place 
      * make the array null ended and update argc
      */
 break_both_loops:
-    cmd->argv[i] = 0; /* FIXME */
+    cmd->argv[i] = 0;
     cmd->argc = i;
     return;
 }
@@ -204,7 +222,7 @@ shell_stop(shell_cmd *cmd, shell_status *status) {
  */
 int
 shell_execute(shell_cmd *cmd) {
-    return syscall_execp(cmd->argv[0], cmd->argc, cmd->argv); /* FIXME */
+    return syscall_execp(cmd->argv[0], cmd->argc, (const char **)cmd->argv);
 }
 
 /* foreground: return true if the shell was started in foreground
@@ -265,6 +283,7 @@ main(void) {
      */
     shell_cmd *cmd = &cmd_s;
     shell_status *status = &status_s;
+    shell_init(cmd, status);
     while (1) {
         shell_prompt("> ");
         shell_parse(cmd,status);

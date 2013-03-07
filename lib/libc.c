@@ -179,6 +179,7 @@ char *stringcopy(char *target, const char *source, int buflen)
  */
 void memcopy(int buflen, void *target, const void *source)
 {
+    //kprintf("buflen %d, target %d, source %d\n", buflen, target, source);
     int i;
     char *t;
     const char *s;

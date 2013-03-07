@@ -36,14 +36,14 @@
 # $Id: Makefile,v 1.6 2005/05/09 00:05:44 jaatroko Exp $
 
 # Add your _userland_ program sources to this variable:
-SOURCES  := halt.c shell.c
+SOURCES  := halt.c shell.c test_join.c
 
 OBJECTS  := $(patsubst %.c, %.o, $(SOURCES))
 TARGETS  := $(patsubst %.o, %, $(OBJECTS))
 
 # crt.o must be the first one and the $(SYSLIBS) must come first in
 # the pre-requisites list (or object files list).
-SYSLIBS := crt.o _syscall.o lib.o
+SYSLIBS := crt.o _syscall.o lib.o str.o
 
 # Compiler configuration
 CC      := mips-elf-gcc

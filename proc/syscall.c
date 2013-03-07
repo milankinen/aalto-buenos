@@ -64,6 +64,7 @@ static void handle_execp(context_t *user_context, thread_table_t *my_entry) {
     PID_t created_child;
 
 
+
     // ===== FILENAME ======
 
     virt_filename = (char*)user_context->cpu_regs[MIPS_REGISTER_A1];
@@ -79,6 +80,7 @@ static void handle_execp(context_t *user_context, thread_table_t *my_entry) {
         user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
         return;
     }
+
 
     // ===== EXECP ARGUMENTS =====
 

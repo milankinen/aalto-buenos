@@ -9,7 +9,7 @@ echo "Creating file system storage..."
 
 # add our userland programs to it
 util/tfstool write store.file tests/halt halt
-# TODO: all own programs...
+util/tfstool write store.file tests/test_join test_join
 
 echo "Starting program $1..."
 # start kernel with given program

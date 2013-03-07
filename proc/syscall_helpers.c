@@ -31,7 +31,7 @@ int read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
                 // buffer overflow: too long string to read
                 return RETVAL_SYSCALL_HELPERS_NOK;
             }
-            physical_target[i] = virtual_source[vaddr + j];
+            physical_target[i] = virtual_source[i];
             if (physical_target[i] == '\0') {
                 // found line ending, return number of bytes used (=chars readed)
                 return i + 1;

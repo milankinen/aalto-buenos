@@ -225,13 +225,13 @@ int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
                 if(ADDR_IS_ON_EVEN_PAGE(vaddr) && pagetable->entries[i].V0) {
                     *p_physpageoff = pagetable->entries[i].PFN0;
                     // TODO: shift vpn?
-                    *p_virtpageoff = pagetable->entries[i].VPN2;
+                    *p_virtpageoff = pagetable->entries[i].VPN2 << 13;
                     found = 1;
                     break;
                 } else if (pagetable->entries[i].V1 == 1) {
                     *p_physpageoff = pagetable->entries[i].PFN1;
                     // TODO: shift vpn?
-                    *p_virtpageoff = pagetable->entries[i].VPN2;
+                    *p_virtpageoff = pagetable->entries[i].VPN2 << 13;
                     found = 1;
                     break;
                 }

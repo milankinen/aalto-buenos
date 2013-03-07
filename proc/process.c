@@ -178,7 +178,7 @@ void process_start(const char *executable)
 
 #ifdef CHANGED_2
     char** argv;
-    char* virtual_argv[CONFIG_SYSCALL_MAX_ARGC];
+    char* virtual_argv[CONFIG_SYSCALL_MAX_ARGC + 1]; // +1 for filename
     int argc;
     PID_t parent_pid, my_pid;
     process_table_t* parent_proc_entry;
@@ -252,6 +252,7 @@ void process_start(const char *executable)
     _interrupt_set_state(intr_status);
 
     file = vfs_open((char *)executable);
+
     /* Make sure the file existed and was a valid ELF file */
     KERNEL_ASSERT(file >= 0);
     KERNEL_ASSERT(elf_parse_header(&elf, file));
@@ -343,6 +344,7 @@ void process_start(const char *executable)
     user_context.pc = elf.entry_point;
 
 #ifdef CHANGED_2
+    vfs_close(file);
 
     // add main arguments
     for (i = 0 ; i < argc ; i++) {
@@ -351,23 +353,38 @@ void process_start(const char *executable)
         user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
         // copy our string to it
         memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), argv[i]);
-        virtual_argv[i] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
+        virtual_argv[i + 1] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
     }
+
+    // filename is ALWAYS first argument
+    arglen = strlen(executable) + 1;
+    user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
+    memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), executable);
+    virtual_argv[0] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
+    argc++;
+
     // construct char**
-    for (i = argc - 1 ; i >= 0 ; i++) {
+    for (i = argc - 1 ; i >= 0 ; i--) {
         // reserve space from stack
-        user_context.cpu_regs[MIPS_REGISTER_SP] -= sizeof(uint32_t);
+        user_context.cpu_regs[MIPS_REGISTER_SP] -= sizeof(char**);
         // write argument address to space
-        memcopy(sizeof(uint32_t), (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), virtual_argv + i);
+        memcopy(sizeof(char*), (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), virtual_argv + i);
     }
+
+    // stack must be 4-bytes aligned
+    user_context.cpu_regs[MIPS_REGISTER_SP] -= user_context.cpu_regs[MIPS_REGISTER_SP] % sizeof(uint32_t);
+
     user_context.cpu_regs[MIPS_REGISTER_A0] = argc;
     user_context.cpu_regs[MIPS_REGISTER_A1] = argc > 0 ? user_context.cpu_regs[MIPS_REGISTER_SP] : 0;
+    // decrement stack pointer by two parameters (argc, argv)
+    user_context.cpu_regs[MIPS_REGISTER_SP] -= 2 * sizeof(uint32_t);
 
     if (data != NULL) {
-        // all ok, let parent process to resume
-        data->child_pid = my_pid;
+        //kprintf("start: %d\n", my_pid);
+        // all ok, let parent process to resume (+1 so that pid is never 0)
+        data->child_pid = my_pid + 1;
         data->ready = 1;
-        condition_signal(parent_proc_entry->die_cond, parent_proc_entry->die_lock);
+        condition_broadcast(parent_proc_entry->die_cond, parent_proc_entry->die_lock);
         lock_release(parent_proc_entry->die_lock);
     }
 #endif

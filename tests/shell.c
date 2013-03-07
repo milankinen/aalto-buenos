@@ -3,7 +3,7 @@
  */
 
 #include "tests/lib.h"
-#include "lib/libc.h"
+#include "tests/str.h"
 
 #define SHELL_LINELEN 128
 #define SHELL_ARGLEN 16

@@ -69,7 +69,7 @@ void syscall_handle_exit(int retval) {
     process_table_t* my_entry;
     thread_table_t* my_thread;
     interrupt_status_t intr_stat;
-    PID_t child_pid;
+    PID_t child_pid, my_pid;
     uint32_t i;
 
 
@@ -77,6 +77,7 @@ void syscall_handle_exit(int retval) {
         // no negative return values accepted
         retval = -retval;
     }
+    my_pid = get_current_process_pid();
     my_entry = get_current_process_entry();
     if (my_entry != NULL) {
         my_thread = thread_get_current_thread_entry();
@@ -114,6 +115,7 @@ void syscall_handle_exit(int retval) {
         _interrupt_set_state(intr_stat);
     }
 
+    //kprintf("exit %d\n", my_pid);
     // all resources free, kill this thread
     thread_finish();
 
@@ -128,11 +130,12 @@ int syscall_handle_join(PID_t pid) {
     if (my_entry == NULL) {
         return RETVAL_SYSCALL_USERLAND_NOK;
     }
-    if (pid < 0 || pid >= CONFIG_MAX_PROCESSES) {
+    if (pid <= 0 || pid > CONFIG_MAX_PROCESSES) {
         // entry not found
         return RETVAL_SYSCALL_USERLAND_NOK;
     }
-    child_entry = process_table + pid;
+    // -1 because create process returns pid+1 (we must access right table entry!)
+    child_entry = process_table + pid - 1;
     if (child_entry->parent_pid != get_current_process_pid()) {
         // not child process
         return RETVAL_SYSCALL_USERLAND_NOK;

@@ -1,11 +1,11 @@
 *.o
 *.d
+*.map
 
 tfstool
 
 # kernel binary file and memory mapping
 buenos
-buenos.map
 
 # virtual storage file
 store.file
@@ -13,6 +13,8 @@ store.file
 # runtime socket
 tty0.socket
 
-#halt
+# userland executables
 halt
-halt.map
+shell
+test_join
+

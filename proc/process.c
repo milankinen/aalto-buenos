@@ -366,7 +366,7 @@ void process_start(const char *executable)
     // construct char**
     for (i = argc - 1 ; i >= 0 ; i--) {
         // reserve space from stack
-        user_context.cpu_regs[MIPS_REGISTER_SP] -= sizeof(char**);
+        user_context.cpu_regs[MIPS_REGISTER_SP] -= sizeof(char*);
         // write argument address to space
         memcopy(sizeof(char*), (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), virtual_argv + i);
     }

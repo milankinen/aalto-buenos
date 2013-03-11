@@ -223,17 +223,16 @@ int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
                    virtual pages. Let's handle them separately here,
                    and we have much more fun when updating the TLB later.*/
                 if(ADDR_IS_ON_EVEN_PAGE(vaddr) && pagetable->entries[i].V0) {
-                    *p_physpageoff = pagetable->entries[i].PFN0;
-                    // TODO: shift vpn?
+                	*p_physpageoff = pagetable->entries[i].PFN0;
                     *p_virtpageoff = pagetable->entries[i].VPN2 << 13;
                     found = 1;
-                    break;
+                	break;
                 } else if (pagetable->entries[i].V1 == 1) {
+
                     *p_physpageoff = pagetable->entries[i].PFN1;
-                    // TODO: shift vpn?
-                    *p_virtpageoff = pagetable->entries[i].VPN2 << 13;
+                    *p_virtpageoff = (pagetable->entries[i].VPN2 << 13) | 0x00001000;
                     found = 1;
-                    break;
+                   break;
                 }
 
             }

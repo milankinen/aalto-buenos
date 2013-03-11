@@ -14,7 +14,7 @@
 int read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
         char* physical_target, int max_length) {
 
-    uint32_t i, j, virtual_page_start, virtual_page_end, vaddr, phys_page_start;
+    uint32_t i, virtual_page_start, virtual_page_end, vaddr, phys_page_start;
     int inside_pagetable;
 
     i = 0;
@@ -26,7 +26,7 @@ int read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
             return RETVAL_SYSCALL_HELPERS_NOK;
         }
         virtual_page_end = virtual_page_start + PAGE_SIZE;
-        for (j = 0 ; vaddr + i < virtual_page_end ; i++, j++) {
+        for (; vaddr + i < virtual_page_end ; i++) {
             if (i >= (uint32_t)max_length) {
                 // buffer overflow: too long string to read
                 return RETVAL_SYSCALL_HELPERS_NOK;
@@ -45,11 +45,13 @@ int read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
 
 int read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
         void* physical_target, int size) {
-    uint32_t i, j, virtual_page_start, virtual_page_end, vaddr, phys_page_start;
+    uint32_t i, virtual_page_start, virtual_page_end, vaddr, phys_page_start;
     int inside_pagetable;
 
     i = 0;
+
     while (i < (uint32_t)size) {
+
         vaddr = (uint32_t)(virtual_source + i);
         inside_pagetable = vm_get_vaddr_page_offsets(pagetable, vaddr, &phys_page_start, &virtual_page_start);
         if (!inside_pagetable) {
@@ -57,9 +59,11 @@ int read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
             return RETVAL_SYSCALL_HELPERS_NOK;
         }
         virtual_page_end = virtual_page_start + PAGE_SIZE;
-        for (j = 0 ; vaddr + i < virtual_page_end ; i++, j++) {
-            ((char*)physical_target)[i] = ((char*)virtual_source)[vaddr + j];
+        for (; vaddr + i < virtual_page_end && i < (uint32_t) size ; i++) {
+
+        	((char*)physical_target)[i] = ((char*)virtual_source)[i];
         }
+
 
     }
     // block with given size was read successfully
@@ -69,7 +73,7 @@ int read_data_from_vm(pagetable_t* pagetable, const void* virtual_source,
 
 int write_data_to_vm(pagetable_t* pagetable, const void* physical_source,
         void* virtual_target, int size) {
-    uint32_t i, j, virtual_page_start, virtual_page_end, vaddr, phys_page_start;
+    uint32_t i, virtual_page_start, virtual_page_end, vaddr, phys_page_start;
     int inside_pagetable;
 
     i = 0;
@@ -81,8 +85,8 @@ int write_data_to_vm(pagetable_t* pagetable, const void* physical_source,
             return RETVAL_SYSCALL_HELPERS_NOK;
         }
         virtual_page_end = virtual_page_start + PAGE_SIZE;
-        for (j = 0 ; vaddr + i < virtual_page_end ; i++, j++) {
-            ((char*)virtual_target)[vaddr + j] = ((char*)physical_source)[i];
+        for (; vaddr + i < virtual_page_end && i < (uint32_t) size  ; i++) {
+            ((char*)virtual_target)[i] = ((char*)physical_source)[i];
         }
 
     }

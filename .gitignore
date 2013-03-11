@@ -17,4 +17,4 @@ tty0.socket
 halt
 shell
 test_join
-
+test_fs_syscall

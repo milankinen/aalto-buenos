@@ -46,8 +46,6 @@
 #   include "vm/vm.h"
 #endif
 
-
-
 #ifdef CHANGED_2
 
 static void handle_execp(context_t *user_context, thread_table_t *my_entry) {
@@ -63,51 +61,55 @@ static void handle_execp(context_t *user_context, thread_table_t *my_entry) {
     uint32_t dummy;
     PID_t created_child;
 
-
-
     // ===== FILENAME ======
 
-    virt_filename = (char*)user_context->cpu_regs[MIPS_REGISTER_A1];
-    if (!vm_get_vaddr_page_offsets(my_entry->pagetable, (uint32_t)virt_filename, &dummy, &dummy)) {
+    virt_filename = (char*) user_context->cpu_regs[MIPS_REGISTER_A1];
+    if (!vm_get_vaddr_page_offsets(my_entry->pagetable,
+            (uint32_t) virt_filename, &dummy, &dummy)) {
         // filename address not inside userland memory
-        user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
+        user_context->cpu_regs[MIPS_REGISTER_V0] =
+                (uint32_t) RETVAL_SYSCALL_USERLAND_NOK;
         return;
     }
 
     if (read_string_from_vm(my_entry->pagetable, virt_filename, filename,
             CONFIG_SYSCALL_MAX_BUFFER_SIZE) == RETVAL_SYSCALL_HELPERS_NOK) {
         // too long filename
-        user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
+        user_context->cpu_regs[MIPS_REGISTER_V0] =
+                (uint32_t) RETVAL_SYSCALL_USERLAND_NOK;
         return;
     }
-
 
     // ===== EXECP ARGUMENTS =====
 
-    argc = (int)user_context->cpu_regs[MIPS_REGISTER_A2];
-    virt_argv = (char**)user_context->cpu_regs[MIPS_REGISTER_A3];
-    if (argc < 0 || (argc > 0 && !vm_get_vaddr_page_offsets(my_entry->pagetable, (uint32_t)virt_argv,
-            &dummy, &dummy)) || argc >= CONFIG_SYSCALL_MAX_ARGC) {
-        // negative number of arguments or string argument array is not inside userland memory
-        // or too many arguments
-        user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
-        return;
-    }
+    argc = (int) user_context->cpu_regs[MIPS_REGISTER_A2];
+    virt_argv = (char**) user_context->cpu_regs[MIPS_REGISTER_A3];
+    if (argc
+            < 0|| (argc > 0 && !vm_get_vaddr_page_offsets(my_entry->pagetable, (uint32_t)virt_argv,
+                            &dummy, &dummy)) || argc >= CONFIG_SYSCALL_MAX_ARGC) {
+    // negative number of arguments or string argument array is not inside userland memory
+    // or too many arguments
+user_context    ->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
+    return;
+}
     total_used = 0;
     readed_args = 0;
 
-    for (i = 0 ; i < argc ; i++) {
-        if (!vm_get_vaddr_page_offsets(my_entry->pagetable, (uint32_t)virt_argv + i, &dummy, &dummy)) {
+    for (i = 0; i < argc; i++) {
+        if (!vm_get_vaddr_page_offsets(my_entry->pagetable,
+                (uint32_t) virt_argv + i, &dummy, &dummy)) {
             // i'th argument pointer not inside userland memory
-            user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
+            user_context->cpu_regs[MIPS_REGISTER_V0] =
+                    (uint32_t) RETVAL_SYSCALL_USERLAND_NOK;
             return;
         }
-        used = read_string_from_vm(my_entry->pagetable, virt_argv[i], temp + total_used,
-                CONFIG_SYSCALL_MAX_BUFFER_SIZE - total_used);
+        used = read_string_from_vm(my_entry->pagetable, virt_argv[i],
+                temp + total_used, CONFIG_SYSCALL_MAX_BUFFER_SIZE - total_used);
 
         if (used == RETVAL_SYSCALL_HELPERS_NOK) {
             // overflow
-            user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
+            user_context->cpu_regs[MIPS_REGISTER_V0] =
+                    (uint32_t) RETVAL_SYSCALL_USERLAND_NOK;
             return;
         }
         // argument readed successfully, add pointer to it
@@ -119,16 +121,16 @@ static void handle_execp(context_t *user_context, thread_table_t *my_entry) {
     created_child = syscall_handle_execp(filename, argc, argv);
     if (created_child < 0) {
         // child process creation failed for some reason
-        user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)RETVAL_SYSCALL_USERLAND_NOK;
+        user_context->cpu_regs[MIPS_REGISTER_V0] =
+                (uint32_t) RETVAL_SYSCALL_USERLAND_NOK;
         return;
     }
 
     // return child processes id
-    user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t)created_child;
+    user_context->cpu_regs[MIPS_REGISTER_V0] = (uint32_t) created_child;
 }
 
 #endif
-
 
 /**
  * Handle system calls. Interrupts are enabled when this function is
@@ -137,8 +139,7 @@ static void handle_execp(context_t *user_context, thread_table_t *my_entry) {
  * @param user_context The userland context (CPU registers as they
  * where when system call instruction was called in userland)
  */
-void syscall_handle(context_t *user_context)
-{
+void syscall_handle(context_t *user_context) {
     /* When a syscall is executed in userland, register a0 contains
      * the number of the syscall. Registers a1, a2 and a3 contain the
      * arguments of the syscall. The userland code expects that after
@@ -152,8 +153,8 @@ void syscall_handle(context_t *user_context)
 
     thread_table_t *my_entry;
     my_entry = thread_get_current_thread_entry();
-
-    switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
+    int return_value;
+    switch (user_context->cpu_regs[MIPS_REGISTER_A0]) {
     case SYSCALL_HALT:
         halt_kernel();
         break;
@@ -161,11 +162,40 @@ void syscall_handle(context_t *user_context)
         handle_execp(user_context, my_entry);
         break;
     case SYSCALL_EXIT:
-        syscall_handle_exit((int)user_context->cpu_regs[MIPS_REGISTER_A1]);
+        syscall_handle_exit((int) user_context->cpu_regs[MIPS_REGISTER_A1]);
         break;
     case SYSCALL_JOIN:
         user_context->cpu_regs[MIPS_REGISTER_V0] =
-                (uint32_t)syscall_handle_join((PID_t)user_context->cpu_regs[MIPS_REGISTER_A1]);
+                (uint32_t) syscall_handle_join(
+                        (PID_t) user_context->cpu_regs[MIPS_REGISTER_A1]);
+        break;
+    case SYSCALL_OPEN:
+        return_value = syscall_handle_open(
+                (char*) user_context->cpu_regs[MIPS_REGISTER_A1]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
+        break;
+    case SYSCALL_CLOSE:
+        return_value = syscall_handle_close(
+                user_context->cpu_regs[MIPS_REGISTER_A1]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
+        break;
+    case SYSCALL_READ:
+        return_value = syscall_handle_read(
+                user_context->cpu_regs[MIPS_REGISTER_A1],
+                (char*) user_context->cpu_regs[MIPS_REGISTER_A2],
+                user_context->cpu_regs[MIPS_REGISTER_A3]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
+        break;
+    case SYSCALL_WRITE:
+        return_value = syscall_handle_write(
+                user_context->cpu_regs[MIPS_REGISTER_A1],
+                (char*) user_context->cpu_regs[MIPS_REGISTER_A2],
+                user_context->cpu_regs[MIPS_REGISTER_A3]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
+        break;
+    case SYSCALL_SEEK:
+        syscall_handle_seek(user_context->cpu_regs[MIPS_REGISTER_A1],
+                user_context->cpu_regs[MIPS_REGISTER_A2]);
         break;
     default:
         KERNEL_PANIC("Unhandled system call\n");
@@ -173,10 +203,10 @@ void syscall_handle(context_t *user_context)
 
 #else
     switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
-    case SYSCALL_HALT:
+        case SYSCALL_HALT:
         halt_kernel();
         break;
-    default: 
+        default:
         KERNEL_PANIC("Unhandled system call\n");
     }
 #endif
@@ -184,6 +214,4 @@ void syscall_handle(context_t *user_context)
     /* Move to next instruction after system call */
     user_context->pc += 4;
 }
-
-
 

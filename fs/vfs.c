@@ -42,6 +42,7 @@
 #include "drivers/device.h"
 #include "fs/tfs.h"
 #include "fs/filesystems.h"
+#include "proc/syscall.h"
 
 /** @name Virtual Filesystem
  *
@@ -137,6 +138,14 @@ void vfs_init(void)
 	openfile_table.files[i].filesystem = NULL;
     }
 
+#ifdef CHANGED_2
+    /* occupy the first rows as they are reserverd
+     * for special cases: stdin, stdout,stderr */
+
+    openfile_table.files[FILEHANDLE_STDIN].filesystem = (void*) 1;
+    openfile_table.files[FILEHANDLE_STDOUT].filesystem = (void*) 1;
+    openfile_table.files[FILEHANDLE_STDERR].filesystem = (void*) 1;
+#endif
     vfs_op_sem = semaphore_create(1);
     vfs_unmount_sem = semaphore_create(0);
 

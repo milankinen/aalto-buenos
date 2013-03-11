@@ -60,6 +60,12 @@
 process_table_t process_table[CONFIG_MAX_PROCESSES];
 lock_t* process_table_lock;
 
+static void init_process_filehandle(process_table_t* entry){
+	size_t k;
+    for(k = 0; k < MAX_OPEN_FILES; k++){
+    	entry->filehandle[k] = FILEHANDLE_UNUSED;
+    }
+}
 
 static void free_process_table_entry(process_table_t* entry) {
     entry->tid                = PROCESS_NO_OWNER_TID;
@@ -67,6 +73,7 @@ static void free_process_table_entry(process_table_t* entry) {
     entry->next               = PROCESS_NO_PARENT_PID;
     entry->last_child_pid     = PROCESS_NO_PARENT_PID;
     entry->retval             = PROCESS_NO_RETVAL;
+    init_process_filehandle(entry);
 }
 
 void process_table_init() {
@@ -78,6 +85,7 @@ void process_table_init() {
         free_process_table_entry(process_table + i);
         process_table[i].die_lock           = lock_create();
         process_table[i].die_cond           = condition_create();
+        init_process_filehandle(&process_table[i]);
     }
     _interrupt_set_state(stat);
 }

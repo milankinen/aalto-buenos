@@ -18,7 +18,12 @@
  * Maximum lenght for process name.
  */
 #define PROCESS_NAME_MAX_LENGTH 32
+/**
+ * Maximum number of open files a process can attain
+ */
+#define MAX_OPEN_FILES 10
 
+#define FILEHANDLE_UNUSED -1
 
 typedef struct {
     /* Owner thread id. -1 if process is not running (associated to any thread) */
@@ -50,7 +55,8 @@ typedef struct {
     /* If process has child processes then this points to last child (linked list) */
     PID_t last_child_pid;
 
-    /* TODO: ADD OTHER FIELDS, PERHAPS SOME FILE HANDLING STUFF? */
+    /*references to open file handles */
+    int filehandle[MAX_OPEN_FILES];
 
 } process_table_t;
 

@@ -490,64 +490,6 @@ void process_start(const char *executable)
 
     interrupt_status_t intr_status;
 
-    char** argv;
-    char* virtual_argv[CONFIG_SYSCALL_MAX_ARGC + 1]; // +1 for filename
-    int argc;
-    PID_t parent_pid, my_pid;
-    process_table_t* parent_proc_entry;
-    process_table_t* my_proc_entry;
-    int arglen;
-
-    my_pid = PROCESS_NO_PARENT_PID;
-    my_proc_entry = NULL;
-    if (data != NULL) {
-        argc = data->argc;
-        argv = data->argv;
-        parent_pid = data->parent_pid;
-        parent_proc_entry = process_table + parent_pid;
-        // parent process is waiting until child is created
-        lock_acquire(parent_proc_entry->die_lock);
-    } else {
-        argc = 0;
-        argv = NULL;
-        parent_pid = PROCESS_NO_PARENT_PID;
-        parent_proc_entry = NULL;
-    }
-
-    intr_status = _interrupt_disable();
-    lock_acquire(process_table_lock);
-
-    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
-        if (process_table[i].tid == PROCESS_NO_OWNER_TID &&
-                process_table[i].parent_pid == PROCESS_NO_PARENT_PID) {
-            // found a free process entry, fill it properly
-            my_proc_entry                   = process_table + i;
-            my_proc_entry->tid              = thread_get_current_thread();
-            my_proc_entry->parent_pid       = parent_pid;
-            my_proc_entry->next             = PROCESS_NO_PARENT_PID;
-            my_proc_entry->last_child_pid   = PROCESS_NO_PARENT_PID;
-            my_proc_entry->retval           = PROCESS_NO_RETVAL;
-            stringcopy(my_proc_entry->name, "foobar", PROCESS_NAME_MAX_LENGTH);
-            my_pid = (PID_t)i;
-            if (parent_proc_entry != NULL) {
-                // correct child process linked list
-                if (parent_proc_entry->last_child_pid != PROCESS_NO_PARENT_PID) {
-                    my_proc_entry->next = parent_proc_entry->last_child_pid;
-                }
-                parent_proc_entry->last_child_pid = my_pid;
-            }
-            break;
-        }
-    }
-
-    lock_release(process_table_lock);
-    _interrupt_set_state(intr_status);
-
-    if (my_proc_entry == NULL) {
-        // no free process entries found, restore state and release possible locks
-        restore_process_state(data, my_proc_entry);
-    }
-
     my_entry = thread_get_current_thread_entry();
 
 
@@ -654,50 +596,6 @@ void process_start(const char *executable)
     memoryset(&user_context, 0, sizeof(user_context));
     user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
     user_context.pc = elf.entry_point;
-
-    vfs_close(file);
-
-    // add main arguments
-    for (i = 0 ; i < argc ; i++) {
-        arglen = strlen(argv[i]) + 1;
-        // reserve space from stack
-        user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
-        // copy our string to it
-        memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), argv[i]);
-        virtual_argv[i + 1] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
-    }
-
-    // filename is ALWAYS first argument
-    arglen = strlen(executable) + 1;
-    user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
-    memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), executable);
-    virtual_argv[0] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
-    argc++;
-
-    // construct char**
-    for (i = argc - 1 ; i >= 0 ; i--) {
-        // reserve space from stack
-        user_context.cpu_regs[MIPS_REGISTER_SP] -= sizeof(char*);
-        // write argument address to space
-        memcopy(sizeof(char*), (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), virtual_argv + i);
-    }
-
-    // stack must be 4-bytes aligned
-    user_context.cpu_regs[MIPS_REGISTER_SP] -= user_context.cpu_regs[MIPS_REGISTER_SP] % sizeof(uint32_t);
-
-    user_context.cpu_regs[MIPS_REGISTER_A0] = argc;
-    user_context.cpu_regs[MIPS_REGISTER_A1] = argc > 0 ? user_context.cpu_regs[MIPS_REGISTER_SP] : 0;
-    // decrement stack pointer by two parameters (argc, argv)
-    user_context.cpu_regs[MIPS_REGISTER_SP] -= 2 * sizeof(uint32_t);
-
-    if (data != NULL) {
-        //kprintf("start: %d\n", my_pid);
-        // all ok, let parent process to resume (+1 so that pid is never 0)
-        data->child_pid = my_pid + 1;
-        data->ready = 1;
-        condition_broadcast(parent_proc_entry->die_cond, parent_proc_entry->die_lock);
-        lock_release(parent_proc_entry->die_lock);
-    }
 
     thread_goto_userland(&user_context);
 

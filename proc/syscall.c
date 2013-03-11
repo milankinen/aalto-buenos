@@ -194,8 +194,18 @@ void syscall_handle(context_t *user_context) {
         user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
         break;
     case SYSCALL_SEEK:
-        syscall_handle_seek(user_context->cpu_regs[MIPS_REGISTER_A1],
+        return_value = syscall_handle_seek(user_context->cpu_regs[MIPS_REGISTER_A1],
                 user_context->cpu_regs[MIPS_REGISTER_A2]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
+        break;
+    case SYSCALL_CREATE:
+        return_value = syscall_handle_create((char*) user_context->cpu_regs[MIPS_REGISTER_A1],
+                user_context->cpu_regs[MIPS_REGISTER_A2]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
+        break;
+    case SYSCALL_DELETE:
+        return_value = syscall_handle_delete((char*) user_context->cpu_regs[MIPS_REGISTER_A1]);
+        user_context->cpu_regs[MIPS_REGISTER_V0] = return_value;
         break;
     default:
         KERNEL_PANIC("Unhandled system call\n");

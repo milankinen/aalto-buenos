@@ -5,8 +5,6 @@
 #define MAX(arg1,arg2) ((arg1) > (arg2) ? (arg1) : (arg2))
 
 
-static int vxnprintf(char*, int, const char*, va_list, int);
-
 /* (almost) snprintf(3) */
 int snprintf(char *str, int size, const  char  *fmt, ...) {
     va_list ap;
@@ -312,7 +310,7 @@ static int scan_int(const char *s, const char **next) {
  * characters are written (including the trailing '\0'). Returns the
  * number of characters actually written.
  */
-static int vxnprintf(char *buf,
+int vxnprintf(char *buf,
              int size,
              const char *fmt,
              va_list ap,

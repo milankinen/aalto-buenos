@@ -49,6 +49,9 @@ uint32_t _syscall(uint32_t syscall_num, uint32_t a1, uint32_t a2, uint32_t a3);
 
 /* The library functions which are just wrappers to the _syscall function. */
 
+/* standard std out printing with 128 mark buffer */
+void cout(const char* text, ...);
+
 void syscall_halt(void);
 
 int syscall_exec(const char *filename);

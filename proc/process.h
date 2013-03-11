@@ -42,6 +42,24 @@ typedef int process_id_t;
 
 #ifdef CHANGED_2
 
+
+/** These values indicates different exist statuses for process. */
+#define PROCESS_EXIT_STATUS_EXCEPTION_TLBM      653010
+#define PROCESS_EXIT_STATUS_EXCEPTION_TLBL      653011
+#define PROCESS_EXIT_STATUS_EXCEPTION_TLBS      653012
+#define PROCESS_EXIT_STATUS_EXCEPTION_ADDRL     653013
+#define PROCESS_EXIT_STATUS_EXCEPTION_ADDRS     653014
+#define PROCESS_EXIT_STATUS_EXCEPTION_BUSI      653015
+#define PROCESS_EXIT_STATUS_EXCEPTION_BUSD      653016
+#define PROCESS_EXIT_STATUS_EXCEPTION_BREAK     653017
+#define PROCESS_EXIT_STATUS_EXCEPTION_RESVI     653018
+#define PROCESS_EXIT_STATUS_EXCEPTION_COPROC    653019
+#define PROCESS_EXIT_STATUS_EXCEPTION_AOFLOW    653020
+#define PROCESS_EXIT_STATUS_EXCEPTION_TRAP      653021
+#define PROCESS_EXIT_STATUS_EXCEPTION_UNKNOWN   653022
+
+
+
 /** This constant indicates that process has no parent. */
 #define PROCESS_NO_PARENT_PID -1
 /** This constant indicates that process has no owner thread so it is not in the execution atm. */

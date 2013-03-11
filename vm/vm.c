@@ -135,10 +135,17 @@ void vm_destroy_pagetable(pagetable_t *pagetable)
  *
  */
 
-void vm_map(pagetable_t *pagetable, 
+#ifdef CHANGED_2
+int vm_map(pagetable_t *pagetable,
 	    uint32_t physaddr, 
 	    uint32_t vaddr,
             int dirty)
+#else
+void vm_map(pagetable_t *pagetable,
+        uint32_t physaddr,
+        uint32_t vaddr,
+            int dirty)
+#endif
 {
     unsigned int i;
 
@@ -151,25 +158,41 @@ void vm_map(pagetable_t *pagetable,
 	       and we have much more fun when updating the TLB later.*/
 	    if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
 		if(pagetable->entries[i].V0 == 1) {
+#ifdef CHANGED_2
+		    return -1;
+#else
 		    KERNEL_PANIC("Tried to re-map same virtual page");
+#endif
 		} else {
 		    /* Map the page on a pair entry */
 		    pagetable->entries[i].PFN0 = physaddr >> 12;
 		    pagetable->entries[i].V0 = 1;
 		    pagetable->entries[i].G0 = 0;
 		    pagetable->entries[i].D0 = dirty;
+#ifdef CHANGED_2
+		    return 1;
+#else
 		    return;
+#endif
 		}
 	    } else {
 		if(pagetable->entries[i].V1 == 1) {
+#ifdef CHANGED_2
+		    return -1;
+#else
 		    KERNEL_PANIC("Tried to re-map same virtual page");
+#endif
 		} else {
 		    /* Map the page on a pair entry */
 		    pagetable->entries[i].PFN1 = physaddr >> 12;
 		    pagetable->entries[i].V1 = 1;
 		    pagetable->entries[i].G1 = 0;
 		    pagetable->entries[i].D1 = dirty;
+#ifdef CHANGED_2
+		    return 1;
+#else
 		    return;
+#endif
 		}
 	    }
 	}
@@ -182,7 +205,11 @@ void vm_map(pagetable_t *pagetable,
 		pagetable->ASID);
 	kprintf("during an attempt to map vaddr 0x%8.8x => phys 0x%8.8x.\n",
 		vaddr, physaddr);
+#ifdef CHANGED_2
+	return -1;
+#else
 	KERNEL_PANIC("Thread run out of pagetable mapping entries.");
+#endif
     }
 
     /* Map the page on a new entry */
@@ -205,6 +232,9 @@ void vm_map(pagetable_t *pagetable,
     }
 
     pagetable->valid_count++;
+#ifdef CHANGED_2
+    return 1;
+#endif
 }
 
 

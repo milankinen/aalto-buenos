@@ -198,7 +198,9 @@ void syscall_handle(context_t *user_context) {
                 user_context->cpu_regs[MIPS_REGISTER_A2]);
         break;
     default:
-        KERNEL_PANIC("Unhandled system call\n");
+        user_context->cpu_regs[MIPS_REGISTER_V0] = RETVAL_SYSCALL_USERLAND_NOK;
+        break;
+        //KERNEL_PANIC("Unhandled system call\n");
     }
 
 #else

@@ -18,3 +18,4 @@ halt
 shell
 test_join
 test_fs_syscall
+run_all_tests

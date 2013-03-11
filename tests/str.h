@@ -16,6 +16,8 @@
 /* userland sprintf */
 int snprintf(char *str, int size, const  char  *fmt, ...);
 
+int vxnprintf(char*, int, const char*, va_list, int);
+
 /* Prototypes for string manipulation functions */
 int stringcmp(const char *str1, const char *str2);
 char *stringcopy(char *target, const char *source, int buflen);

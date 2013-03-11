@@ -44,8 +44,14 @@ void vm_init(void);
 pagetable_t *vm_create_pagetable(uint32_t asid);
 void vm_destroy_pagetable(pagetable_t *pagetable);
 
-void vm_map(pagetable_t *pagetable, uint32_t physaddr, 
+#ifdef CHANGED_2
+int vm_map(pagetable_t *pagetable, uint32_t physaddr,
 	    uint32_t vaddr, int dirty);
+#else
+void vm_map(pagetable_t *pagetable, uint32_t physaddr, 
+        uint32_t vaddr, int dirty);
+#endif
+
 void vm_unmap(pagetable_t *pagetable, uint32_t vaddr);
 
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty);

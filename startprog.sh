@@ -13,6 +13,9 @@ util/tfstool write store.file tests/test_join test_join
 util/tfstool write store.file tests/test_fs_syscall test_fs_syscall
 util/tfstool write store.file tests/test.txt test.txt
 
+
+util/tfstool write store.file tests/run_all_tests run_all_tests
+
 echo "Starting program $1..."
 # start kernel with given program
 yams buenos "initprog=[disk1]$1"

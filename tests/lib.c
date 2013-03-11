@@ -41,7 +41,18 @@
 
 #include "proc/syscall.h"
 #include "tests/lib.h"
+#include "tests/str.h"
 
+
+void cout(const char* str, ...) {
+    va_list ap;
+    char buffer[128];
+    int written;
+    va_start(ap, str);
+    written = vxnprintf(buffer, 128, str, ap, 0);
+    va_end(ap);
+    syscall_write(stdout, buffer, written);
+}
 
 /* Halt the system (sync disks and power off). This function will
  * never return. 

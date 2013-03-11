@@ -28,11 +28,11 @@ static void run_suites() {
        snprintf(filename, 20, "[disk1]%s", tests[i][0]);
        for (j = 0 ; j < cases[i] ; j++) {
            argv[0] = tests[i][j+1];
-           cout("Running test %s [%s]", filename, argv[0]);
+           cout("Running test %s [%s]\n", filename, argv[0]);
            test_pid = syscall_execp((const char*)filename, 1, (const char**)argv);
            if (test_pid >= 0) {
                retval = syscall_join(test_pid);
-               cout("Test (PID: %d) over, return value: %d", test_pid, retval);
+               cout("Test (PID: %d) over, return value: %d\n", test_pid, retval);
            }
        }
    }
@@ -46,6 +46,7 @@ int main() {
 
     testsuite = create_test_suite("test_join");
     add_test_case(testsuite, "basic");
+    add_test_case(testsuite, "nochild");
 
 
     run_suites();

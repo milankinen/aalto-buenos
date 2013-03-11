@@ -426,6 +426,9 @@ void process_start(const char *executable, child_process_create_data_t* data)
         arglen = strlen(argv[i]) + 1;
         // reserve space from stack
         user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
+        // ensure that stack is 4-bytes aligned
+        user_context.cpu_regs[MIPS_REGISTER_SP] -= user_context.cpu_regs[MIPS_REGISTER_SP] % sizeof(uint32_t);
+
         // copy our string to it
         memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), argv[i]);
         virtual_argv[i + 1] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
@@ -434,9 +437,13 @@ void process_start(const char *executable, child_process_create_data_t* data)
     // filename is ALWAYS first argument
     arglen = strlen(executable) + 1;
     user_context.cpu_regs[MIPS_REGISTER_SP] -= arglen;
+    // ensure that stack is 4-bytes aligned
+    user_context.cpu_regs[MIPS_REGISTER_SP] -= user_context.cpu_regs[MIPS_REGISTER_SP] % sizeof(uint32_t);
+    // copy executable name to free space
     memcopy(arglen, (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), executable);
     virtual_argv[0] = (char*)(user_context.cpu_regs[MIPS_REGISTER_SP]);
     argc++;
+
 
     // construct char**
     for (i = argc - 1 ; i >= 0 ; i--) {
@@ -446,11 +453,10 @@ void process_start(const char *executable, child_process_create_data_t* data)
         memcopy(sizeof(char*), (void*)(user_context.cpu_regs[MIPS_REGISTER_SP]), virtual_argv + i);
     }
 
-    // stack must be 4-bytes aligned
-    user_context.cpu_regs[MIPS_REGISTER_SP] -= user_context.cpu_regs[MIPS_REGISTER_SP] % sizeof(uint32_t);
-
     user_context.cpu_regs[MIPS_REGISTER_A0] = argc;
     user_context.cpu_regs[MIPS_REGISTER_A1] = argc > 0 ? user_context.cpu_regs[MIPS_REGISTER_SP] : 0;
+
+
     // decrement stack pointer by two parameters (argc, argv)
     user_context.cpu_regs[MIPS_REGISTER_SP] -= 2 * sizeof(uint32_t);
 

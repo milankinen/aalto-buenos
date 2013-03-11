@@ -3,38 +3,33 @@
 #include "tests/str.h"
 
 
-static int run_basic(int argc, char** argv) {
-    char a1[16];
-    char a2[16];
-    char a3[16];
-    char* args[4];
-    int pid;
+static int run_basic() {
+    int pid, retval;
+    cout("** Test basic join\n");
+    pid = syscall_exec("[disk1]test_join");
+    retval = syscall_join(pid);
+    cout("** Basic join complete, return value %d (expected 9).\n", retval);
+    return 0;
+}
 
-    argv = argv;
-    stringcopy(a1, "basic", 16);
-    stringcopy(a2, "asdasd", 16);
-    stringcopy(a3, "asdasdasd", 16);
-    args[0] = a1;
-    args[1] = a2;
-    args[2] = a3;
-
-    // we must pass "basic" attribute so that child process identifies the
-    // right test case
-    if (argc == 0) argc = 1;
-    argc++;
-    if (argc <= 3) {
-        pid = syscall_execp("[disk1]test_join", argc, (const char**)args);
-        if (syscall_join(pid) < 0) {
-            return 666;
-        }
-    }
-    return argc;
+static int run_nochild() {
+    int retval;
+    cout("** Test no child join\n");
+    //pid = syscall_exec("[disk1]test_join");
+    retval = syscall_join(-1);
+    cout("** No child join complete, should return negative, returned: %d\n", retval);
+    return 0;
 }
 
 
 int main(int argc, char** argv) {
-    if (stringcmp(argv[1], "basic")) {
-        return run_basic(argc - 1, argv + 1);
+    if (argc <= 1) {
+        return 9;
+    }
+    if (stringcmp(argv[1], "basic") == 0) {
+        return run_basic();
+    } else if (stringcmp(argv[1], "nochild") == 0) {
+        return run_nochild();
     }
     return 0;
 }

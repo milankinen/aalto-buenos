@@ -428,7 +428,13 @@ int vfs_mount(fs_t *fs, char *name)
     int i;
     int row;
 
+#ifdef CHANGED_2
+    if(name == NULL || name[0] == '\0'){
+        return VFS_ERROR;
+    }
+#else
     KERNEL_ASSERT(name != NULL && name[0] != '\0');
+#endif
 
     if (vfs_start_op() != VFS_OK)
         return VFS_UNUSABLE;
@@ -606,17 +612,37 @@ openfile_t vfs_open(char *pathname)
  *
  */
 
+#ifdef CHANGED_2
+static openfile_entry_t *vfs_verify_open(openfile_t file)
+{
+    openfile_entry_t *openfile;
+
+    if(!(file >= 0 && file < CONFIG_MAX_OPEN_FILES)){
+        return NULL;
+    }
+
+    openfile = &openfile_table.files[file];
+    if(!(openfile->filesystem != NULL)){
+        return NULL;
+    }
+
+    return openfile;
+}
+
+#else
+
 static openfile_entry_t *vfs_verify_open(openfile_t file)
 {
     openfile_entry_t *openfile;
 
     KERNEL_ASSERT(file >= 0 && file < CONFIG_MAX_OPEN_FILES);
+
     openfile = &openfile_table.files[file];
     KERNEL_ASSERT(openfile->filesystem != NULL);
 
     return openfile;
 }
-
+#endif
 
 /**
  * Close open file.
@@ -638,7 +664,13 @@ int vfs_close(openfile_t file)
 
     semaphore_P(openfile_table.sem);
 
+
     openfile = vfs_verify_open(file);
+#ifdef CHANGED_2
+    if(openfile==NULL){
+        return VFS_ERROR;
+    }
+#endif
     fs = openfile->filesystem;
 
     ret = fs->close(fs, openfile->fileid);
@@ -670,10 +702,21 @@ int vfs_seek(openfile_t file, int seek_position)
     if (vfs_start_op() != VFS_OK)
         return VFS_UNUSABLE;
 
+#ifdef CHANGED_2
+    if(!(seek_position >=0)){
+        return VFS_ERROR;
+    }
+#else
     KERNEL_ASSERT(seek_position >= 0);
+#endif
     semaphore_P(openfile_table.sem);
 
     openfile = vfs_verify_open(file);
+#ifdef CHANGED_2
+    if(openfile==NULL){
+        return VFS_ERROR;
+    }
+#endif
     openfile->seek_position = seek_position;
 
     semaphore_V(openfile_table.sem);
@@ -709,10 +752,20 @@ int vfs_read(openfile_t file, void *buffer, int bufsize)
         return VFS_UNUSABLE;
 
     openfile = vfs_verify_open(file);
+#ifdef CHANGED_2
+    if(openfile==NULL){
+        return VFS_ERROR;
+    }
+#endif
     fs = openfile->filesystem;
 
+#ifdef CHANGED_2
+    if(!(bufsize >= 0 && buffer != NULL)){
+        return VFS_ERROR;
+    }
+#else
     KERNEL_ASSERT(bufsize >= 0 && buffer != NULL);
-
+#endif
     ret = fs->read(fs, openfile->fileid, buffer, bufsize, 
 			openfile->seek_position);
 
@@ -753,6 +806,11 @@ int vfs_write(openfile_t file, void *buffer, int datasize)
         return VFS_UNUSABLE;
 
     openfile = vfs_verify_open(file);
+#ifdef CHANGED_2
+    if(openfile==NULL){
+        return VFS_ERROR;
+    }
+#endif
     fs = openfile->filesystem;
 
     KERNEL_ASSERT(datasize >= 0 && buffer != NULL);

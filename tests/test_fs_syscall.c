@@ -129,29 +129,68 @@ void test_create() {
     /*create a lots of files*/
     int i;
     char FILEPATH2[] = "[disk1]hauki";
-    for(i = 0; i < 15; i++){
+    for (i = 0; i < 15; i++) {
         FILEPATH2[8]++;
-    return_value = syscall_create(FILEPATH2, 512);
-    assert(0, return_value, "test_create_6_failed\n");
+        return_value = syscall_create(FILEPATH2, 512);
+        assert(0, return_value, "test_create_6_failed\n");
     }
 
 }
 
-void test_delete(){
+void test_delete() {
 
-    char FILEPATH[] = "[disk1]andromeia";
+    char *FILEPATH = "[disk1]andromeia";
     /*delete a file already residing in the fs*/
     int return_value = syscall_delete("[disk1]test.txt");
     assert(0, return_value, "test_delete_1_failed\n");
 
     /*try to delete it again*/
     return_value = syscall_delete("[disk1]test.txt");
-    assert(VFS_NOT_FOUND, return_value ,"test_delete2_failed\n");
+    assert(VFS_NOT_FOUND, return_value, "test_delete2_failed\n");
 
     /*create and delete files*/
     syscall_create(FILEPATH, 512);
     return_value = syscall_delete(FILEPATH);
     assert(0, return_value, "test_delete3_failed\n");
+
+}
+
+void test_complex() {
+
+    char *param[1];
+    char filename[] = "[disk1]tempfile";
+    char text[] = "text";
+    param[0] = filename;
+    /* open a file with another process and fail to write to
+     * the opened filehandle with the main process
+     */
+    int PID = syscall_execp("[disk1]write", 1, (const char **) param);
+    int filehandle = syscall_join(PID);
+    assert(0, MIN(0, filehandle), "test_complext_1_failed");
+    int return_value = syscall_write(filehandle, text, strlen(text));
+    assert(VFS_NOT_FOUND, return_value, "test_complex2_failed");
+
+    return_value = syscall_read(filehandle, text, 3);
+    assert(VFS_NOT_FOUND, return_value, "test_complex3_failed\n");
+
+    /*create a file and open it multiple times*/
+    syscall_create(filename, 512);
+    int i;
+    for (i = 0; i < 10; i++) {
+
+        return_value = syscall_open(filename);
+        assert(0, MIN(return_value,0), "test_complex4_failed\n");
+    }
+
+    /*fail to open as MAX_OPEN_FILES_PER_PROCESS has been reached*/
+    int return_value2 = syscall_open(filename);
+    assert(VFS_ERROR, return_value2, "test_complex5_failed\n");
+
+    /*after closing a filehandle there should be room to open a new one*/
+    syscall_close(return_value);
+    return_value = syscall_open(filename);
+    assert(0, MIN(return_value, 0), "test_complext6_failed\n");
+
 }
 
 /*NOT in use*/
@@ -168,11 +207,19 @@ void test_read_stdin() {
 
 int main(void) {
 
+    cout("starting test_fs_syscall");
     test_open_close();
+    cout("test_open_close finished\n");
     test_read();
+    cout("test_read finished\n");
     test_write();
+    cout("test_write finished\n");
     test_create();
+    cout("test_create finished\n");
     test_delete();
+    cout("test_delete finished\n");
+    test_complex();
+    cout("test_complex finished\n");
 
     syscall_halt();
     return 0;

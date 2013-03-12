@@ -21,7 +21,7 @@
 /**
  * Maximum number of open files a process can attain
  */
-#define MAX_OPEN_FILES 10
+#define MAX_OPEN_FILES_PER_PROCESS 10
 
 #define FILEHANDLE_UNUSED -1
 
@@ -56,7 +56,7 @@ typedef struct {
     PID_t last_child_pid;
 
     /*references to open file handles */
-    int filehandle[MAX_OPEN_FILES];
+    int filehandle[MAX_OPEN_FILES_PER_PROCESS];
 
 } process_table_t;
 

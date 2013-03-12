@@ -62,7 +62,7 @@ lock_t* process_table_lock;
 
 static void init_process_filehandle(process_table_t* entry){
 	size_t k;
-    for(k = 0; k < MAX_OPEN_FILES; k++){
+    for(k = 0; k < MAX_OPEN_FILES_PER_PROCESS; k++){
     	entry->filehandle[k] = FILEHANDLE_UNUSED;
     }
 }

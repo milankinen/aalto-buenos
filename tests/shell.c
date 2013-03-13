@@ -5,9 +5,15 @@
 #include "tests/lib.h"
 #include "tests/str.h"
 
-#define SHELL_LINELEN 128
+#define SHELL_LINELEN 512
+#define SHELL_MAXEXECSZ 128
 #define SHELL_ARGLEN 16
-#define SHELL_MAXARGS 16
+#define SHELL_MAXARGS 32
+#define SHELL_DISK "[disk1]"
+#define SHELL_NAME "[disk1]shell"
+#define SHELL_CLEAR_LINES 150
+
+#define SHELL_DEL_CHAR 127
 
 /* +2 to accommodate program name and null
  * +1 to accommodate null
@@ -24,12 +30,12 @@ typedef struct {
      * this is null ended
      * used as a wrapper for arga to give smoother typecast
     */
-    char *argv[SHELL_ARGUMENT_ARRAY_LEN];
+    char *argv[SHELL_MAXARGS];
     /* _not_ null ended array! this should only be accessed from argv
      * each string in arga[something] _is_ however null ended
      * this is used for strings and argv is used to feed execp
      */
-    char arga[SHELL_ARGUMENT_ARRAY_LEN][SHELL_ARGUMENT_STRING_LEN];
+    char arga[SHELL_LINELEN];
 } shell_cmd;
 
 /* data structure to hold shell status
@@ -40,10 +46,12 @@ typedef struct {
 typedef enum error_e {
     OK,
     READFAIL,
+    LINELENFAIL,
     EXECPFAIL,
     ARGNFAIL,
-    ARGLENFAIL,
-    FATAL
+    FATAL,
+    SYNTAXFAIL,
+    MAXEXECSZFAIL
 } error_t;
 
 typedef struct {
@@ -57,10 +65,9 @@ void
 shell_init(shell_cmd *cmd, shell_status *status) {
     /* set argv to correspond to the 2-dim array arga */
     int i;
-    for (i = 0; i < SHELL_ARGUMENT_ARRAY_LEN-1; i++)
-        cmd->argv[i] = cmd->arga[i];
-    /* null ending */
-    cmd->argv[i] = 0;
+    memoryset(cmd->arga, 0, SHELL_LINELEN);
+    for (i = 0; i < SHELL_ARGLEN; i++)
+        cmd->argv[i] = 0;
     /* no errors yet */
     status->error = OK;
 }
@@ -77,36 +84,103 @@ shell_prompt(const char *str) {
     shell_print_str(str);
 }
 
-/* readline: reads line character by character until line break
- * returns pointer to the end of the read buffer i.e. the \0 character
- * in error situation 0 is returned if only end of line is read the
- * same address buf is returned
+/**
+ * NOTE this does not notify arrows, we are not supporting arrow navigation
  */
-char *
-shell_readline(char *buf) {
-    int read;
-    while ((read = syscall_read(stdin, buf,sizeof(char)))) {
-        /* if read fails */
-        if (read < 0) {
-            return 0;
+int shell_is_ctrl_char(char ch) {
+    return ch < 32 || ch > 126;
+}
+
+void shell_remove_control_chars(char* str) {
+    int i, actual;
+    char temp[SHELL_LINELEN];
+    actual = 0;
+    for (i = 0 ; str[i] != '\0' ; i++) {
+        if (!shell_is_ctrl_char(str[i])) {
+            temp[actual++] = str[i];
         }
-        /* note: if read == 0 while loop is not executed any more
-         * this means end of file was encountered
-         */
-        /* if we read \n stop */
-        else if (*buf == '\n') {
+    }
+    temp[actual] = '\0';
+    memcopy(actual + 1, str, temp);
+}
+
+void shell_remove_char_from_cin() {
+    char buf[4];
+    /* this sequence deletes one character fron console */
+    buf[0] = 27;
+    buf[1] = 91;
+    buf[2] = 68;
+    buf[3] = ' ';
+    syscall_write(stdout, buf, 4);
+    syscall_write(stdout, buf, 3);
+}
+
+int shell_readchar(char* buf, int offset) {
+    int read;
+    while (1) {
+        read = syscall_read(stdin, buf + offset, sizeof(char));
+        if (read <= 0) return read;
+        /* disable arrows */
+        if ((int)buf[offset] == 27) {
+            /* next two chars are for control.. ignore those */
+            syscall_read(stdin, buf + offset, sizeof(char));
+            syscall_read(stdin, buf + offset, sizeof(char));
+        } else {
+            /* proper char readed! */
             break;
         }
+    }
+
+    return read;
+}
+
+/* readline: reads line character by character until line break
+ * returns error code or OK depending on read result
+ */
+int
+shell_readline(char *buf, const int size) {
+    int read, i;
+    i = 0;
+
+    /* note: if read == 0 while loop is not executed any more
+     * this means end of file was encountered
+     */
+    while ((read = shell_readchar(buf, i))) {
+        /* if read fails */
+        if (read < 0) {
+            return READFAIL;
+        }
+
+        if (buf[i] == '\n' || buf[i] == '\r') {
+            cout("\n");
+            i++;
+            break;
+        }
+
+        if (buf[i] == SHELL_DEL_CHAR) {
+            if (i > 0) {
+                shell_remove_char_from_cin();
+                i--;
+            }
+            continue;
+        }
+
         /* echo the written character */
-        syscall_write(stdout, buf, sizeof(char));
+        cout("%c", buf[i]);
         /* update buffer to new posisition to get new character
          * to its place
          */
-        buf++;
+        i++;
+        if (i >= size - 1) {
+            return LINELENFAIL;
+        }
     }
     /* we want the line to be a c string */
-    *buf = '\0';
-    return buf;
+    buf[i] = '\0';
+    shell_remove_control_chars(buf);
+    //cout("GOT: '%s'\n", buf);
+    //for (i = 0 ; buf[i] != '\0' ; i++) cout("%d ", buf[i]);
+    return OK;
 }
 
 int
@@ -139,6 +213,7 @@ shell_next_nonwhite(char *str, char *end) {
     return str;
 }
 
+
 /* parse: reads line with shell_readline and builds
  * shell_cmd and shell_status data structures
  * - sets shell_cmd null if end of file was the only thing read
@@ -147,86 +222,65 @@ shell_next_nonwhite(char *str, char *end) {
  */
 void
 shell_parse(shell_cmd *cmd, shell_status *status) {
-    char cmdln[SHELL_LINELEN];
-    char *end = shell_readline(cmdln);
-    char *next_white, *next_nonwhite;
-    /* check end for errors */
-    if (end == 0) {
-        /* read failed */
-        status->error = READFAIL;
+    char *next_arg;
+    int res, parsing_arg, i, argc;
+
+    shell_init(cmd, status);
+    res = shell_readline(cmd->arga, SHELL_LINELEN);
+    if (res != OK) {
+        status->error = res;
         return;
     }
-    /* error is left OK since it was initialized in shell_init */
-    /* check if EOF was encountered */
-    if (cmdln-end == 0) {
-        cmd = 0;
-        return;
-    }
-    /* partition cmdln to c strigs separated by whitespace and
-     * assign them to shell_cmd data structure
-     *
-     * start by entering arguments in their positions
-     */
-    int i,j;
-    next_nonwhite = shell_next_nonwhite(cmdln, end);
-    for (i = 0; i < SHELL_ARGUMENT_ARRAY_LEN; i++) {
-        next_white = shell_next_whitespace(next_nonwhite, end);
-        /* copy the string between next_nonwhite and next_white
-         * to its slot in the shell_cmd if arg is too long
-         * update error field in status
-         */
-        for (j = 0; next_nonwhite + j < next_white; j++) {
-            if (j >= SHELL_ARGLEN) {
-                status->error = ARGLENFAIL;
-                cmd->arga[i][j-1] = '\0';
-                goto break_both_loops;
+
+    i = 0;
+    parsing_arg = 0;
+    argc = 0;
+    next_arg = NULL;
+    /* we will find ending \0 because shell_readline returned OK */
+    while (cmd->arga[i] != '\0') {
+        if (!parsing_arg) {
+            if (!shell_iswhitespace(cmd->arga[i])) {
+                next_arg = cmd->arga + i;
+                parsing_arg = 1;
             }
-            cmd->arga[i][j] = next_nonwhite[j];
+        } else {
+            if (shell_iswhitespace(cmd->arga[i])) {
+                if (next_arg) {
+                    cmd->argv[argc++] = next_arg;
+                    /* replace whitespace with \0 so that we can use same buffer as data */
+                    cmd->arga[i] = '\0';
+                    if (argc >= SHELL_MAXARGS) {
+                        /* too many arguments */
+                        status->error = ARGNFAIL;
+                        return;
+                    }
+                }
+                next_arg = NULL;
+                parsing_arg = 0;
+            }
         }
-        /* make the string null ended
-         * there is room since even if now j = SHELL_ARGLEN
-         * the array was designed to hold one more
-         */
-        cmd->arga[i][j] = '\0';
-        next_nonwhite = shell_next_nonwhite(next_white, end);
-        if (next_nonwhite == end)
-            break;
+        i++;
     }
-break_both_loops:
-    /* check if all array was used
-     * this should not happen if there was the allowed number
-     * of arguments
-     */
-    if (i == SHELL_ARGUMENT_ARRAY_LEN - 1) {
-        /* i.e. no room for null which is added _after_ the
-         * last position which is SHELL_ARGUMENT_ARRAY_LEN - 1 
-         */
-        status->error = ARGNFAIL;
-        /* the array is not null ended any more
-         * correct that for robustness
-         */
-        cmd->argv[i] = 0;
-        return;
+    /* put our last (or first) argumentment to list */
+    if (next_arg != NULL) {
+        cmd->argv[argc++] = next_arg;
     }
-    /* if the last argument is &
-     * set background
-     */
-    if (*cmd->argv[i] == '&') {
-        status->foreground = 0;
+
+    /* Determine foreground status, default = executing foreground */
+    status->foreground = 1;
+    if (argc > 0) {
+        if (stringcmp("&", cmd->argv[argc-1]) == 0) {
+            if (argc == 1) {
+                status->error = SYNTAXFAIL;
+                return;
+            }
+            status->foreground = 0;
+            argc--;
+        }
     }
-    else {
-        status->foreground = 1;
-        i++; /* see argc below */
-    }
-    /* now all arguments are in place 
-     * make the array null ended and update argc
-     */
-    cmd->argv[i] = 0;
-    /* argc is the number of arguments plus the program name
-     * thus argv[i] is not the last argument but null
-     * we must add the one above to the i
-     */
-    cmd->argc = i;
+    /* inform argument num */
+    cmd->argc = argc;
+    status->error = OK;
     return;
 }
 
@@ -243,14 +297,41 @@ shell_stop(shell_cmd *cmd, shell_status *status) {
         return 1;
 }
 
-/* execute: call execp and return pid of the created process
+/* execute: call execp and join process
  */
-int
+void
 shell_execute(shell_cmd *cmd, shell_status *status) {
-    int pid = syscall_execp(cmd->argv[0], cmd->argc, (const char **)cmd->argv);
-    if (pid < 0)
-        status->error = EXECPFAIL;
-    return pid;
+    char filename[SHELL_MAXEXECSZ];
+    int pid, retval;
+    if (status->foreground) {
+        if (strlen(cmd->argv[0]) + strlen(SHELL_DISK) >= SHELL_MAXEXECSZ) {
+            status->error = MAXEXECSZFAIL;
+            return;
+        }
+        snprintf(filename, SHELL_MAXEXECSZ, "%s%s", SHELL_DISK, cmd->argv[0]);
+        /* execute original program and join immediately */
+        pid = syscall_execp(filename, cmd->argc - 1, (const char**)(cmd->argv + 1));
+        if (pid < 0) {
+            status->error = EXECPFAIL;
+            return;
+        }
+
+        retval = syscall_join(pid);
+        cout("Done, got: %d\n", retval);
+    } else {
+        /* execute shell program with arguments */
+        pid = syscall_execp(SHELL_NAME, cmd->argc, (const char**)cmd->argv);
+        if (pid < 0) {
+            status->error = EXECPFAIL;
+            return;
+        }
+        /* join shell instance (process space management deals that process table don't run out..
+         * shell starts a new child process but don't join so actual process remains in background
+         * shell returns the pid of created child process
+         */
+        retval = syscall_join(pid);
+        cout("[%d]\n", retval);
+    }
 }
 
 /* foreground: return true if the shell was started in foreground
@@ -271,6 +352,51 @@ shell_print_int(int pid) {
     shell_print_str(pidstr);
 }
 
+/**
+ * returns 1 if user requests exit from shell (types "exit")
+ */
+int shell_request_exit(shell_cmd* cmd, shell_status* status) {
+    if (status->error == OK && cmd->argc > 0) {
+        if (stringcmp("exit", cmd->argv[0]) == 0) {
+            /* if we have one argument then it is ok. */
+            if (cmd->argc == 1) return 1;
+            /* otherwise we have a syntax error */
+            status->error = SYNTAXFAIL;
+        }
+    }
+    return 0;
+}
+
+/** implement clear inside shell because we have to print return value.. so we cannot
+ * create new executable becuase its return value would ruin the clearing..
+ */
+int shell_request_clear(shell_cmd* cmd, shell_status* status) {
+    int i;
+    if (status->error == OK && cmd->argc > 0) {
+        if (stringcmp("clear", cmd->argv[0]) == 0) {
+            /* if we have one argument then it is ok. */
+            if (cmd->argc == 1) {
+                for (i = 0 ; i < SHELL_CLEAR_LINES ; i++) cout("\n");
+                return 1;
+            }
+            /* otherwise we have a syntax error */
+            status->error = SYNTAXFAIL;
+        }
+    }
+    return 0;
+}
+
+
+int shell_start_background_proc(int argc, char** argv) {
+    char filename[SHELL_MAXEXECSZ];
+    if (strlen(argv[1]) + strlen(SHELL_DISK) >= SHELL_MAXEXECSZ) {
+        return -1;
+    }
+    snprintf(filename, SHELL_MAXEXECSZ, "%s%s", SHELL_DISK, argv[1]);
+    return syscall_execp(filename, argc - 2, (const char **)(argv + 2));
+}
+
+
 void
 shell_handle_error(shell_status *status) {
     switch(status->error) {
@@ -290,13 +416,23 @@ shell_handle_error(shell_status *status) {
             /* non fatal error, return ok state */
             status->error = OK;
             break;
-        case ARGLENFAIL:
-            shell_print_str("Error: too long arguments.\n");
+        case LINELENFAIL:
+            shell_print_str("Error: too long line.\n");
             /* non fatal error, return ok state */
             status->error = OK;
             break;
         case EXECPFAIL:
             shell_print_str("Error: execution failed.\n");
+            /* non fatal error, return ok state */
+            status->error = OK;
+            break;
+        case SYNTAXFAIL:
+            shell_print_str("Error: syntax error.\n");
+            /* non fatal error, return ok state */
+            status->error = OK;
+            break;
+        case MAXEXECSZFAIL:
+            shell_print_str("Error: too long executable name.\n");
             /* non fatal error, return ok state */
             status->error = OK;
             break;
@@ -309,8 +445,7 @@ shell_handle_error(shell_status *status) {
 }
 
 int
-main(void) {
-    int pid;
+main(int argc, char** argv) {
     shell_cmd cmd_s;
     shell_status status_s;
     /* since parse function modifies cmd_s and status_s 
@@ -319,10 +454,27 @@ main(void) {
      */
     shell_cmd *cmd = &cmd_s;
     shell_status *status = &status_s;
+
+    /* if we have arguments then it means that shell is meant to run in background
+     * execp a new process without joining and return pid.
+     */
+    if (argc > 1) {
+        return shell_start_background_proc(argc, argv);
+    }
+
+
     shell_init(cmd, status);
     while (1) {
         shell_prompt("> ");
         shell_parse(cmd,status);
+        if (shell_request_exit(cmd, status)) {
+            /** User requests exit. */
+            return 0;
+        }
+        if (shell_request_clear(cmd, status)) {
+            continue;
+        }
+
         if (status->error != OK) {
             /* this if is at the moment needed to
              * continue the while loop from the beginning
@@ -330,18 +482,15 @@ main(void) {
             shell_handle_error(status);
             continue;
         }
+
         if (shell_stop(cmd, status))
             break;
-        pid = shell_execute(cmd, status);
-        if (status->error != OK) {
-            shell_handle_error(status);
-            continue;
-        }
-        if (shell_foreground(status)) {
-            syscall_join(pid);
-        }
-        else {
-            shell_print_int(pid);
+        if (cmd->argc > 0) {
+            shell_execute(cmd, status);
+            if (status->error != OK) {
+                shell_handle_error(status);
+                continue;
+            }
         }
     }
     return 0;

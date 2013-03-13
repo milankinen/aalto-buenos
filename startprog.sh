@@ -13,6 +13,7 @@ util/tfstool write store.file tests/test_join test_join
 util/tfstool write store.file tests/test_fs_syscall test_fs_syscall
 util/tfstool write store.file tests/test.txt test.txt
 util/tfstool write store.file tests/write write
+util/tfstool write store.file tests/shell shell
 
 util/tfstool write store.file tests/run_all_tests run_all_tests
 

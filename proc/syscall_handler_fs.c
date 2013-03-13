@@ -13,6 +13,22 @@
 #include "drivers/gcd.h"
 #include "kernel/config.h"
 
+/*check that the process has the given filehandle */
+static int check_filehandle(openfile_t filehandle, process_table_t* pt) {
+    int i;
+    int filehandle_found = -1;
+    for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {
+        if (pt->filehandle[i] == filehandle) {
+            filehandle_found = 1;
+            break;
+        }
+    }
+    if (filehandle_found == -1) {
+        return VFS_NOT_OPEN;
+    }
+    return 1;
+}
+
 openfile_t syscall_handle_open(const char *filename) {
 
     process_table_t *pt = get_current_process_entry();
@@ -20,7 +36,7 @@ openfile_t syscall_handle_open(const char *filename) {
     for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {
         if (pt->filehandle[i] == FILEHANDLE_UNUSED) {
             int filehandle = vfs_open((char*) filename);
-            if(filehandle < 0){
+            if (filehandle < 0) {
                 return filehandle;
             }
             pt->filehandle[i] = filehandle;
@@ -50,27 +66,16 @@ int syscall_handle_close(openfile_t filehandle) {
 }
 
 int syscall_handle_seek(openfile_t filehandle, int offset) {
-    /*TODO EXCEPTION HANDLING*/
-    vfs_seek(filehandle, offset);
 
-    return 0;
+    process_table_t *pt = get_current_process_entry();
+
+    if (check_filehandle(filehandle, pt) == VFS_NOT_OPEN) {
+        return VFS_NOT_FOUND;
+    }
+    return vfs_seek(filehandle, offset);
+
 }
 
-/*check that the process has the given filehandle */
-static int check_filehandle(openfile_t filehandle, process_table_t* pt) {
-    int i;
-    int filehandle_found = -1;
-    for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {
-        if (pt->filehandle[i] == filehandle) {
-            filehandle_found = 1;
-            break;
-        }
-    }
-    if (filehandle_found == -1) {
-        return VFS_NOT_OPEN;
-    }
-    return 1;
-}
 
 int syscall_handle_read(openfile_t filehandle, void *buffer, int length) {
     char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
@@ -170,7 +175,7 @@ int syscall_handle_create(const char *filename, int size) {
         return VFS_INVALID_PARAMS;
     }
     if (read_data_from_vm(p, filename, temp,
-           strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
+            strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
         kprintf("Process was killed\n");
         syscall_handle_exit(0);
         return -1;
@@ -187,7 +192,7 @@ int syscall_handle_delete(const char *filename) {
         return VFS_INVALID_PARAMS;
     }
     if (read_data_from_vm(p, filename, temp,
-           strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
+            strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
         kprintf("Process was killed\n");
         syscall_handle_exit(0);
         return -1;

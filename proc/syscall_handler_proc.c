@@ -72,12 +72,16 @@ void syscall_handle_exit(int retval) {
     PID_t child_pid, my_pid;
     uint32_t i;
 
-
     if (retval < 0) {
         // no negative return values accepted
         retval = -retval;
     }
     my_pid = get_current_process_pid();
+    /* silence the compiler
+     * FIXME if necessary
+     */
+    my_pid = my_pid;
+
     my_entry = get_current_process_entry();
     if (my_entry != NULL) {
         my_thread = thread_get_current_thread_entry();

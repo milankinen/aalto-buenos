@@ -97,6 +97,8 @@ shell_readline(char *buf) {
         else if (*buf == '\n') {
             break;
         }
+        /* echo the written character */
+        syscall_write(stdout, buf, sizeof(char));
         /* update buffer to new posisition to get new character
          * to its place
          */
@@ -121,7 +123,7 @@ shell_iswhitespace(char c) {
  */
 char *
 shell_next_whitespace(char *str, char *end) {
-    while (shell_iswhitespace(*str) && (str < end))
+    while (!shell_iswhitespace(*str) && (str < end))
         str++;
     return str;
 }
@@ -132,7 +134,7 @@ shell_next_whitespace(char *str, char *end) {
  */
 char *
 shell_next_nonwhite(char *str, char *end) {
-    while (!shell_iswhitespace(*str) && (str < end))
+    while (shell_iswhitespace(*str) && (str < end))
         str++;
     return str;
 }
@@ -141,6 +143,7 @@ shell_next_nonwhite(char *str, char *end) {
  * shell_cmd and shell_status data structures
  * - sets shell_cmd null if end of file was the only thing read
  * - sets the fields of shell_cmd null if no command was read
+ * - sets status foreground field
  */
 void
 shell_parse(shell_cmd *cmd, shell_status *status) {
@@ -173,34 +176,56 @@ shell_parse(shell_cmd *cmd, shell_status *status) {
          * update error field in status
          */
         for (j = 0; next_nonwhite + j < next_white; j++) {
-            if (j >= SHELL_ARGUMENT_STRING_LEN) {
+            if (j >= SHELL_ARGLEN) {
                 status->error = ARGLENFAIL;
                 cmd->arga[i][j-1] = '\0';
                 goto break_both_loops;
             }
             cmd->arga[i][j] = next_nonwhite[j];
         }
+        /* make the string null ended
+         * there is room since even if now j = SHELL_ARGLEN
+         * the array was designed to hold one more
+         */
+        cmd->arga[i][j] = '\0';
         next_nonwhite = shell_next_nonwhite(next_white, end);
         if (next_nonwhite == end)
             break;
     }
+break_both_loops:
     /* check if all array was used
      * this should not happen if there was the allowed number
      * of arguments
      */
-    if (i == SHELL_ARGUMENT_ARRAY_LEN) {
+    if (i == SHELL_ARGUMENT_ARRAY_LEN - 1) {
+        /* i.e. no room for null which is added _after_ the
+         * last position which is SHELL_ARGUMENT_ARRAY_LEN - 1 
+         */
         status->error = ARGNFAIL;
         /* the array is not null ended any more
          * correct that for robustness
          */
-        cmd->argv[i-1] = 0;
+        cmd->argv[i] = 0;
         return;
+    }
+    /* if the last argument is &
+     * set background
+     */
+    if (*cmd->argv[i] == '&') {
+        status->foreground = 0;
+    }
+    else {
+        status->foreground = 1;
+        i++; /* see argc below */
     }
     /* now all arguments are in place 
      * make the array null ended and update argc
      */
-break_both_loops:
     cmd->argv[i] = 0;
+    /* argc is the number of arguments plus the program name
+     * thus argv[i] is not the last argument but null
+     * we must add the one above to the i
+     */
     cmd->argc = i;
     return;
 }
@@ -221,8 +246,11 @@ shell_stop(shell_cmd *cmd, shell_status *status) {
 /* execute: call execp and return pid of the created process
  */
 int
-shell_execute(shell_cmd *cmd) {
-    return syscall_execp(cmd->argv[0], cmd->argc, (const char **)cmd->argv);
+shell_execute(shell_cmd *cmd, shell_status *status) {
+    int pid = syscall_execp(cmd->argv[0], cmd->argc, (const char **)cmd->argv);
+    if (pid < 0)
+        status->error = EXECPFAIL;
+    return pid;
 }
 
 /* foreground: return true if the shell was started in foreground
@@ -246,6 +274,12 @@ shell_print_int(int pid) {
 void
 shell_handle_error(shell_status *status) {
     switch(status->error) {
+        case OK:
+            /* this will not be executed by the current code
+             * but is added to include all possible cases
+             * for error_t (can't cause compiler warning)
+             */
+            break;
         case READFAIL:
             shell_print_str("Error: syscall_read failed.\n");
             /* shut down the shell in the next phase */
@@ -266,9 +300,11 @@ shell_handle_error(shell_status *status) {
             /* non fatal error, return ok state */
             status->error = OK;
             break;
-        default:
-            shell_print_str("Error: n/a.\n");
-            status->error = FATAL;
+        case FATAL:
+            /* is not handled here but shell stop will
+             * shutdown the shell later
+             */
+            break;
     }
 }
 
@@ -288,12 +324,15 @@ main(void) {
         shell_prompt("> ");
         shell_parse(cmd,status);
         if (status->error != OK) {
+            /* this if is at the moment needed to
+             * continue the while loop from the beginning
+             */
             shell_handle_error(status);
             continue;
         }
         if (shell_stop(cmd, status))
             break;
-        pid = shell_execute(cmd);
+        pid = shell_execute(cmd, status);
         if (status->error != OK) {
             shell_handle_error(status);
             continue;

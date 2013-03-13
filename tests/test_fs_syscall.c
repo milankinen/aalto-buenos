@@ -166,9 +166,9 @@ void test_complex() {
      */
     int PID = syscall_execp("[disk1]write", 1, (const char **) param);
     int filehandle = syscall_join(PID);
-    assert(0, MIN(0, filehandle), "test_complext_1_failed");
+    assert(0, MIN(0, filehandle), "test_complext_1_failed\n");
     int return_value = syscall_write(filehandle, text, strlen(text));
-    assert(VFS_NOT_FOUND, return_value, "test_complex2_failed");
+    assert(VFS_NOT_FOUND, return_value, "test_complex2_failed\n");
 
     return_value = syscall_read(filehandle, text, 3);
     assert(VFS_NOT_FOUND, return_value, "test_complex3_failed\n");

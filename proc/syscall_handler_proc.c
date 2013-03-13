@@ -27,6 +27,9 @@ static void new_process_thread(uint32_t dataptr) {
     process_start(dat->filename, dat);
 }
 
+static int is_data_ready(child_process_create_data_t* d) {
+    return d->ready;
+}
 
 PID_t syscall_handle_execp(const char *filename, int argc, char** argv) {
 
@@ -48,11 +51,13 @@ PID_t syscall_handle_execp(const char *filename, int argc, char** argv) {
     }
 
     my_entry = get_current_process_entry();
-    // start child thread
-    thread_run(child_thread);
     // wait until child process is created
     lock_acquire(my_entry->die_lock);
-    while (!dat.ready) {
+
+    // start child thread
+    thread_run(child_thread);
+
+    while (!is_data_ready(&dat)) {
         condition_wait(my_entry->die_cond, my_entry->die_lock);
     }
     lock_release(my_entry->die_lock);

@@ -136,7 +136,6 @@ static void restore_process_state(child_process_create_data_t* data, process_tab
     uint32_t i;
     process_table_t* parent_entry;
     thread_table_t* thread_entry;
-
     thread_entry = thread_get_current_thread_entry();
     if (entry != NULL) {
         intr_stat = _interrupt_disable();
@@ -163,7 +162,7 @@ static void restore_process_state(child_process_create_data_t* data, process_tab
         parent_entry = process_table + data->parent_pid;
         data->ready = 1;
         // we have parent process waiting, we must inform the failure to our parent
-        condition_signal(parent_entry->die_cond, parent_entry->die_lock);
+        condition_broadcast(parent_entry->die_cond, parent_entry->die_lock);
         lock_release(parent_entry->die_lock);
     }
     if (executable_filehandle >= 0) {

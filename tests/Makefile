@@ -36,7 +36,8 @@
 # $Id: Makefile,v 1.6 2005/05/09 00:05:44 jaatroko Exp $
 
 # Add your _userland_ program sources to this variable:
-SOURCES  := halt.c shell.c test_join.c test_fs_syscall.c run_all_tests.c write.c
+SOURCES  := halt.c shell.c test_join.c test_panic.c test_fs_syscall.c run_all_tests.c \
+			test_adventure.c write.c
 
 OBJECTS  := $(patsubst %.c, %.o, $(SOURCES))
 TARGETS  := $(patsubst %.o, %, $(OBJECTS))

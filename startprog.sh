@@ -5,11 +5,13 @@ rm store.file
 
 echo "Creating file system storage..."
 # create new filesystem
-./util/tfstool create store.file 2048 disk1
+./util/tfstool create store.file 4096 disk1
 
 # add our userland programs to it
 util/tfstool write store.file tests/halt halt
+util/tfstool write store.file tests/test_adventure test_adventure
 util/tfstool write store.file tests/test_join test_join
+util/tfstool write store.file tests/test_panic test_panic
 util/tfstool write store.file tests/test_fs_syscall test_fs_syscall
 util/tfstool write store.file tests/test.txt test.txt
 util/tfstool write store.file tests/write write

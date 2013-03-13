@@ -46,10 +46,10 @@
 
 void cout(const char* str, ...) {
     va_list ap;
-    char buffer[128];
+    char buffer[256];
     int written;
     va_start(ap, str);
-    written = vxnprintf(buffer, 128, str, ap, 0);
+    written = vxnprintf(buffer, 256, str, ap, 0);
     va_end(ap);
     syscall_write(stdout, buffer, written);
 }

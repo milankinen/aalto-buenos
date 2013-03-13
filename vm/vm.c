@@ -246,6 +246,11 @@ int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
     *p_physpageoff = 0;
     *p_virtpageoff = 0;
 
+    if (vaddr < 0x00001000) {
+        // no vaddresses allowed < 4096 (=tlb page size)
+        return found;
+    }
+
     if (pagetable) {
         for(i=0; i<pagetable->valid_count; i++) {
             if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {

@@ -31,6 +31,7 @@ int read_string_from_vm(pagetable_t* pagetable, const char* virtual_source,
                 // buffer overflow: too long string to read
                 return RETVAL_SYSCALL_HELPERS_NOK;
             }
+            // kprintf("Reading addr: %d, val = %d\n", virtual_source + i, virtual_source[i]);
             physical_target[i] = virtual_source[i];
             if (physical_target[i] == '\0') {
                 // found line ending, return number of bytes used (=chars readed)

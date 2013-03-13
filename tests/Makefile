@@ -37,7 +37,7 @@
 
 # Add your _userland_ program sources to this variable:
 SOURCES  := halt.c shell.c test_join.c test_panic.c test_fs_syscall.c run_all_tests.c \
-			test_adventure.c write.c
+			test_adventure.c write.c append.c cat.c touch.c
 
 OBJECTS  := $(patsubst %.c, %.o, $(SOURCES))
 TARGETS  := $(patsubst %.o, %, $(OBJECTS))

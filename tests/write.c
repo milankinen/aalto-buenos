@@ -4,8 +4,6 @@
 
 /*create a file, dont close the filehandle
  * and return the unclosed filehandle
- *
- * THIS PROGRAM IS ONLY USED BY test_fs_syscall
  */
 
 #include "tests/lib.h"

@@ -1,0 +1,813 @@
+BUENOS
+is a
+University Educational Nutshell Operating System
+Roadmap to the BUENOS system
+Version 1.1.2
+February 3, 2012
+Juha Aatrokoski, Timo Lilja, Leena Salmela,
+Teemu J. Takanen and Aleksi VirtanenBUENOS is licenced under the following ”modiﬁed BSD license” (i.e., the BSD license
+without the advertising clause).
+Copyright © 2003–2012 Juha Aatrokoski, Timo Lilja, Leena Salmela,
+Teemu J. Takanen and Aleksi Virtanen
+Redistribution and use in source and binary forms, with or without modiﬁcation,
+are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this
+list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
+3. The name of the author may not be used to endorse or promote products
+derived from this software without speciﬁc prior written permission.
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.Contents
+1 Introduction 1
+1.1 Expected Background Knowledge . . . . . . . . . . . . . . . . . . . . 1
+1.2 How to Use This Document . . . . . . . . . . . . . . . . . . . . . . . 2
+1.3 BUENOS for teachers . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+1.3.1 Preparing for BUENOS Course . . . . . . . . . . . . . . . . . . 2
+1.4 Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+1.5 Contact Information . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+2 Using Buenos 4
+2.1 Installation and Requirements . . . . . . . . . . . . . . . . . . . . . . 4
+2.2 Compilation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+2.3 Booting the System . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+2.4 Compiling Userland Programs . . . . . . . . . . . . . . . . . . . . . . 5
+2.5 Using the Makeﬁles . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+2.5.1 System Makeﬁle . . . . . . . . . . . . . . . . . . . . . . . . . 5
+2.5.2 Userland Makeﬁle . . . . . . . . . . . . . . . . . . . . . . . . 6
+2.6 Using Trivial Filesystem . . . . . . . . . . . . . . . . . . . . . . . . . 6
+2.7 Starting Processes . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+3 Kernel Overview 8
+3.1 Directory Structure . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+3.2 Kernel Architecture . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+3.2.1 Threading . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+3.2.2 Virtual Memory . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.2.3 Support for Multiple Processors . . . . . . . . . . . . . . . . . 11
+3.3 Kernel Programming . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+3.3.1 Memory Usage . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+3.3.2 Stacks and Contexts . . . . . . . . . . . . . . . . . . . . . . . 13
+3.3.3 Library Functions . . . . . . . . . . . . . . . . . . . . . . . . 14
+3.3.4 Using a Console . . . . . . . . . . . . . . . . . . . . . . . . . 14
+3.3.5 Busy Waiting . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+3.3.6 Floating Point Numbers . . . . . . . . . . . . . . . . . . . . . 14
+3.3.7 Naming Conventions . . . . . . . . . . . . . . . . . . . . . . . 14
+3.3.8 Debug Printing . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+3.3.9 C Calling Conventions . . . . . . . . . . . . . . . . . . . . . . 15
+3.3.10 Kernel Boot Arguments . . . . . . . . . . . . . . . . . . . . . 15
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+4 Threading and Scheduling 16
+4.1 Threads . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+4.1.1 Thread Table . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+4.1.2 Thread Library . . . . . . . . . . . . . . . . . . . . . . . . . . 174.2 Scheduler . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+4.2.1 Idle thread . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+4.3 Context Switch . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+4.3.1 Interrupt Vectors . . . . . . . . . . . . . . . . . . . . . . . . . 22
+4.3.2 Context Switching Code . . . . . . . . . . . . . . . . . . . . . 23
+4.3.3 Thread Contexts . . . . . . . . . . . . . . . . . . . . . . . . . 24
+4.4 Exception Processing in Kernel Mode . . . . . . . . . . . . . . . . . 25
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+5 Synchronization Mechanisms 27
+5.1 Spinlocks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+5.1.1 LL and SC Instructions . . . . . . . . . . . . . . . . . . . . . 27
+5.1.2 Spinlock Implementation . . . . . . . . . . . . . . . . . . . . 28
+5.2 Sleep Queue . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+5.2.1 Using the Sleep Queue . . . . . . . . . . . . . . . . . . . . . . 28
+5.2.2 How the Sleep Queue is Implemented . . . . . . . . . . . . . 30
+5.3 Semaphores . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+5.3.1 Semaphore Implementation . . . . . . . . . . . . . . . . . . . 32
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+6 Userland Processes 37
+6.1 Process Startup . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+6.2 Userland Binary Format . . . . . . . . . . . . . . . . . . . . . . . . . 38
+6.3 Exception Handling . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+6.4 System Calls . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+6.4.1 How System Calls Work . . . . . . . . . . . . . . . . . . . . . 42
+6.4.2 System Calls in BUENOS . . . . . . . . . . . . . . . . . . . . . 42
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+7 Virtual Memory 48
+7.1 Hardware Support for Virtual Memory . . . . . . . . . . . . . . . . . 48
+7.2 Virtual memory initialization . . . . . . . . . . . . . . . . . . . . . . 49
+7.3 Page Pool . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+7.4 Pagetables and Memory Mapping . . . . . . . . . . . . . . . . . . . . 50
+7.5 TLB . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+7.5.1 TLB dual entries and ASID in MIPS32 architectures . . . . . 53
+7.5.2 TLB miss exception, Load reference . . . . . . . . . . . . . . 53
+7.5.3 TLB miss exception, Store reference . . . . . . . . . . . . . . 53
+7.5.4 TLB modiﬁed exception . . . . . . . . . . . . . . . . . . . . . 53
+7.5.5 TLB wrapper functions in BUENOS . . . . . . . . . . . . . . . 53
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 57
+8 Filesystem 59
+8.1 Filesystem Conventions . . . . . . . . . . . . . . . . . . . . . . . . . 59
+8.2 Filesystem Layers . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 59
+8.3 Virtual Filesystem . . . . . . . . . . . . . . . . . . . . . . . . . . . . 60
+8.3.1 Return Values . . . . . . . . . . . . . . . . . . . . . . . . . . 60
+8.3.2 Limits . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 61
+8.3.3 Internal Data Structures . . . . . . . . . . . . . . . . . . . . . 62
+8.3.4 VFS Operations . . . . . . . . . . . . . . . . . . . . . . . . . 62
+8.3.5 File Operations . . . . . . . . . . . . . . . . . . . . . . . . . . 64
+8.3.6 Filesystem Operations . . . . . . . . . . . . . . . . . . . . . . 67
+8.3.7 Filesystem Driver Interface . . . . . . . . . . . . . . . . . . . 69
+8.4 Trivial Filesystem . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 728.4.1 TFS Driver Module . . . . . . . . . . . . . . . . . . . . . . . 73
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 77
+9 Networking 79
+9.1 Network Services . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+9.2 Packet Oriented Transport Protocol . . . . . . . . . . . . . . . . . . 83
+9.2.1 Sockets . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 84
+9.2.2 POP-Speciﬁc Structures and Functions . . . . . . . . . . . . 85
+9.3 Stream Oriented Protocol API . . . . . . . . . . . . . . . . . . . . . 89
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 90
+10 Device Drivers 91
+10.1 Interrupt Handlers . . . . . . . . . . . . . . . . . . . . . . . . . . . . 92
+10.2 Device Abstraction Layers . . . . . . . . . . . . . . . . . . . . . . . . 93
+10.2.1 Device Driver Implementor’s Checklist . . . . . . . . . . . . . 93
+10.2.2 Device Driver Interface . . . . . . . . . . . . . . . . . . . . . 94
+10.2.3 Generic Character Device . . . . . . . . . . . . . . . . . . . . 96
+10.2.4 Generic Block Device . . . . . . . . . . . . . . . . . . . . . . 96
+10.2.5 Generic Network Device . . . . . . . . . . . . . . . . . . . . . 99
+10.3 Drivers . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 99
+10.3.1 Polling TTY driver . . . . . . . . . . . . . . . . . . . . . . . . 99
+10.3.2 Interrupt driven TTY driver . . . . . . . . . . . . . . . . . . 101
+10.3.3 Network driver . . . . . . . . . . . . . . . . . . . . . . . . . . 103
+10.3.4 Disk driver . . . . . . . . . . . . . . . . . . . . . . . . . . . . 103
+10.3.5 Timer driver . . . . . . . . . . . . . . . . . . . . . . . . . . . 107
+10.3.6 Metadevice Drivers . . . . . . . . . . . . . . . . . . . . . . . . 108
+Exercises . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 109
+11 Booting and Initializing Hardware 111
+11.1 In the Beginning There was boot.S . . . . . . . . . . . . . . . . . . . 111
+11.2 Hardware and Kernel Initialization . . . . . . . . . . . . . . . . . . . 111
+11.3 System Start-up . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 112
+A Kernel Boot Arguments 113
+B Kernel Conﬁguration Settings 114
+C Example YAMS Conﬁgurations 117
+C.1 Disk . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 117
+Bibliography 118
+Index 119Chapter 1
+Introduction
+BUENOS is a skeleton operating system running on a virtual machine called YAMS.
+The operating system is meant as an exercise base for operating system project
+courses. BUENOS is a realistic system, running on an almost real machine.
+The BUENOS system supports multiple CPUs, provides threading and a wide variety of synchronization primitives. It also includes a skeleton code for userland
+program support, partial support for a virtual memory subsystem, a trivial ﬁlesystem and some networking functionality. Many device drivers are also provided (the
+network card is not supported, because NIC driver implementation is an exercise).
+Many simpliﬁcations have been made to the hardware where the need for clarity has been greater than the need for realism. The YAMS virtual machine does
+not simulate caches, for example, but provides an otherwise fully realistic memory
+model.
+The main idea of the system is to give you a real, working multiprocessor operating system kernel which is as small and simple as possible. BUENOS could be quite
+easily ported to a real MIPS32 hardware, only device drivers and boot code need
+to be modiﬁed. Virtual machine environment is used because of easier development, static hardware settings and device driver simplicity, not because unrealistic
+assumptions are needed by the kernel.
+If you are a student participating on an operating systems project course, the
+course staﬀ has probably already set up a development environment for you. If they
+have not, you must acquire YAMS (see below for details) and compile it. You also
+need a MIPS32 ELF cross compiler to compile BUENOS.
+1.1 Expected Background Knowledge
+Since the BUENOS system is written using the C programming language, you should
+be able to program in C. For an introduction on C programming, see the classical
+reference [K&R]. You also need to know quite much about programming in general,
+particularly about procedural programming.
+We also expect that you have taken a lecture course on operating systems or
+otherwise know the basics about operating systems. You can still ﬁnd OS textbooks
+very handy when doing the exercises. We recommend that you acquire a book by
+Stallings [Stallings] or Tanenbaum [Tanenbaum].
+Since you are going to interact directly with the hardware quite a lot, you should
+know something about hardware. A good introduction on this can be found in the
+book [Patterson].
+Since kernel programming generally involves a lot of synchronization issues a
+course on concurrent programming is recommended. One good book on this ﬁeld2 CHAPTER 1. INTRODUCTION
+is the book by Andrews [Andrews]. These issues are also handled in the operating
+systems books by Stallings and Tanenbaum, but the approach is diﬀerent.
+1.2 How to Use This Document
+This roadmap document is designed to be used both as read-through introduction
+and as a reference guide. To get most out of this document you should probably:
+1. Read chapter 2 (usage) and chapter 3 (system overview) carefully.
+2. Skim through the whole document to get a good overview.
+3. Before designing and implementing your assignments, read carefully all chapters on the subject matter.
+4. Use the document as reference when designing and implementing your improvements.
+1.3 BUENOS for teachers
+As stated above, the BUENOS system is meant as an assignment backbone for operating systems project courses. This document, while primarily acting as reference
+guide to the system, is also designed to support project courses. The document is
+ordered so that various kernel programming issues are introduced in sensible order
+and exercises (see also section 1.4) are provided for each subject area.
+While the system as such can be used as a base for a large variety of assignments,
+this document works best if assignments are divided into ﬁve diﬀerent parts as
+follows:
+1. Synchronization and Multiprogramming. Various multiprogramming
+issues relevant on both multiprocessor and uniprocessor machines are covered
+in chapter 4 and chapter 5.
+2. Userland. Userland processes, interactions between kernel and userland as
+well as system calls are covered in chapter 6.
+3. Virtual Memory. The current virtual memory support mechanisms in
+BUENOS are explained in chapter 7, which also gives exercises on the subject
+area.
+4. Filesystem. Filesystem issues are covered in chapter 8.
+5. Networking. Networking in BUENOS is explained in chapter 9, but note that
+the base system doesn’t include a driver for the network interface. Thus it is
+recommended to provide one as a binary module for students or use chapter 10
+as a part of this round and let students implement one.
+1.3.1 Preparing for BUENOS Course
+To implement an operating systems project course with BUENOS, at least the following steps are necessary:  Provide students with a development environment with precompiled YAMS and
+a MIPS32 ELF cross compiler. See YAMS usage guide for instructions on setup
+of YAMS and the cross compiler environment.1.4. EXERCISES 3  Decide which exercises are used on the course, how many points they are
+worth and what are the deadlines.  Decide any other practical issues (are design reviews compulsory for students,
+how many students there are per group, etc.)  Familiarize the staﬀ with BUENOS and YAMS.  Introduce BUENOS to the students.
+1.4 Exercises
+Each chapter in this document contains a set of exercises. Some of these are meant
+as simple thought challenges and some as much more demanding and larger programming exercises.
+The thought exercises are meant for self study and they can be used to check
+that the contents of the chapter were understood. The programming exercises are
+meant to be possible assignments on operating system project courses.
+The exercises look like this:
+1.1. This is a self study exercise.
+Ï 1.2. This is a programming assignment. They are indicated with a bold exercise
+number and a keyboard symbol.
+1.5 Contact Information
+Latest versions of BUENOS and YAMS can be downloaded from the project home-page
+at:
+http://www.niksula.hut.fi/u/buenos/
+Authors can be contacted (mainly for improvement suggestions and bug reports
+please) through the mailing list buenos@cs.hut.fi. Currently there is no publicly
+available mailing list to subscribe, but one may be created if needed.Chapter 2
+Using Buenos
+2.1 Installation and Requirements
+The BUENOS system requires the following software to run:  YAMS machine simulator, version 1.3.0 or above1  GNU Binutils for mips-elf target  GNU GCC cross-compiler for mips-elf target  GNU Make
+First you have to set up the YAMS machine simulator. From YAMS documentation
+you can ﬁnd instructions on how to set up Binutils and GCC cross-compiler.
+After the required software is installed installing BUENOS is straightforward: you
+simply extract the BUENOS distribution tar-ﬁle to some directory.
+2.2 Compilation
+You can compile the skeleton system by invoking gmake in the main directory of
+the BUENOS.
+After compiling the system, you should have a binary named buenos in the main
+directory.
+2.3 Booting the System
+After the system has been properly built, you can start YAMS with BUENOS binary
+by invoking
+yams buenos
+at the command prompt. If you want to give boot arguments to the system, see
+Appendix A.
+If you are using the default YAMS conﬁguration that is shipped with BUENOS,
+you have to start the yamst terminal tool before invoking yams. The terminal tool
+provides the other end-point of the yams terminal simulation. To start yamst:
+yamst -lu tty0.socket
+in another terminal (e.g. in another XTerm window).
+1A previous version of YAMS can also be used if the output format is set to “binary” in the
+linker script ld.script2.4. COMPILING USERLAND PROGRAMS 5
+2.4 Compiling Userland Programs
+Userland programs are compiled using the same cross-compiler that is used for
+compiling BUENOS. To run compiled programs they need to be copied to a YAMS disk,
+where BUENOS can ﬁnd them. TFS-ﬁlesystem (see section 8.4) is implemented and
+a tool (see section 2.6) is provided to copy binaries from host ﬁlesystem to BUENOS
+ﬁlesystem. To compile userland binaries go to the userland directory tests/ and
+invoke gmake.
+2.5 Using the Makeﬁles
+BUENOS has two makeﬁles that are used to build the binaries needed by BUENOS.
+The system makeﬁle builds the BUENOS binary and the submission archive needed
+to submit the exercises for reviewing. This makeﬁle is in the BUENOS main directory
+and is called Makefile. The other makeﬁle is the makeﬁle responsible for building
+the userland binaries. This makeﬁle is in the tests/ directory.
+2.5.1 System Makeﬁle
+BUENOS uses somewhat unorthodox monolithic makeﬁle. The system is based on
+Peter Miller’s paper [Miller]. BUENOS is divided to modules that correspond to the
+directory structure of the source code tree (see section 3.1).
+The ﬁles in the module directories are built to BUENOS binary. These module
+directories have a ﬁle called module.mk that contains the name of the module and
+list of the ﬁles included from this module. So, for example, the module.mk in the
+lib directory:
+# Makefile for the lib module
+# Set the module name
+MODULE := lib
+FILES := libc.c xprintf.c rand.S bitmap.c debug.c
+SRC += $(patsubst %, $(MODULE)/%, $(FILES))
+If you add ﬁles to your system, you have to modify only the FILES variable.
+There should be no need to change anything else.
+The main makeﬁle is in the main directory and named Makefile. There are few
+features in the Makeﬁle that you have to be aware of. In the unlikely event that you
+wish to add a new module (directory) to the system, you have to modify the MODULES
+variable by extending it with the module name. Remember that this name must be
+same as the directory where the module is. When you do your exercises, you have
+to wrap them with CHANGED n C-Preprocessor variables. You can deﬁne these
+variables by modifying the CHANGEDFLAGS variable. The variable IGNOREDREGEX is
+used when you build your submission archive on returning your assignment. The
+variable contains a regular expression pattern with which the matching ﬁles are
+ﬁltered out from the actual submission archive.
+The following targets can be built by the system makeﬁle:
+all
+The default, builds the BUENOS binary and the tfstool.
+util/tfstool
+Build the tfstool utility.6 CHAPTER 2. USING BUENOS
+clean
+Clean the compilation ﬁles.
+real-clean
+Clean also the depedency ﬁles.
+submit-archive PHASE=n
+Builds submit-n.tar.gz in the parent directory of the main buenos directory.
+The variable n indicates the submission round number (default is 1).
+2.5.2 Userland Makeﬁle
+To build userland binaries go to the tests/ subdirectory and invoke gmake. There
+are no special targets and the makeﬁle is organised so that every binary is built.
+If you wish to add your own binaries to the makeﬁle, add your source ﬁles to the
+SOURCES variable at the beginning of the makeﬁle.
+2.6 Using Trivial Filesystem
+For easy testing of BUENOS, some method is needed to transfer ﬁles to the ﬁlesystem
+in BUENOS. The Unix based utility program, tfstool, which is shipped with BUENOS,
+achieves this goal. tfstool can be used to create a Trivial Filesystem (TFS, see
+section 8.4 for more information about TFS) to a given ﬁle, to examine the contents
+of a ﬁle containing TFS and to transfer ﬁles to the TFS. BUENOS implementation
+of TFS does not include a way to initialize the ﬁlesystem so using tfstool is the
+only way to create a new TFS. tfstool is also used to move userland binaries to
+TFS. When you write your own ﬁlesystem to BUENOS, you might ﬁnd it helpful to
+leave TFS intact. This way you can still use tfstool to transfer ﬁles to the BUENOS
+system without writing another utility for your own ﬁlesystem.
+The implementation of the tfstool is provided in the util/ directory. The
+BUENOS makeﬁle can be used to compile it. Note that tfstool is compiled with the
+native compiler, not the cross-compiler used to compile BUENOS. The implementation
+takes care of byte-order conversion if needed.
+To get a summary of the arguments that tfstool accepts you may run it without
+arguments. The accepted commands are also explained below:
+create ﬁlename size volume-name
+Create a new TFS to ﬁle ﬁlename. The total size of the ﬁle system will
+be size 512-byte blocks. Note that the three ﬁrst blocks are needed for the
+TFS header, the master directory and the block allocation table and therefore
+the minimum size for the disk is 3. The created volume will have the name
+volume-name.
+Note that the number of blocks must be the same as the setting in yams.conf
+list ﬁlename
+List the ﬁles found in the TFS residing in ﬁlename.
+write ﬁlename local-ﬁlename [TFS-ﬁlename]
+Write a ﬁle from the local system (local-ﬁlename) to the TFS residing in the
+ﬁle ﬁlename. The optional fourth argument speciﬁes the ﬁlename in TFS. If
+not given, local-ﬁlename will be used.2.7. STARTING PROCESSES 7
+Note that you probably want to give a TFS ﬁlename, since otherwise you end
+up with a TFS volume with ﬁles named like tests/foobar, which can cause
+confusion since TFS does not support directories.
+read ﬁlename TFS-ﬁlename [local-ﬁlename]
+Read a ﬁle (TFS-ﬁlename) from TFS residing in the ﬁle ﬁlename to the local system. The optional fourth argument speciﬁes the ﬁlename in the local
+system. If not given, the TFS-ﬁlename will be used.
+delete ﬁlename TFS-ﬁlename
+Delete the ﬁle with name TFS-ﬁlename from the TFS residing in the ﬁle
+ﬁlename.
+2.7 Starting Processes
+To start a userland process in BUENOS you have to
+1. have buenos kernel binary (compile if it doesn’t already exist).
+2. have the userland binary (compile if it doesn’t exist).
+3. have a ﬁlesystem disk image (use tfstool to create this).
+4. copy the userland binary with tfstool to the ﬁle system image.
+5. boot the system with proper boot parameters (see Appendix A).
+BUENOS is shipped with simple userland binary halt which invokes the only
+already implemented system call halt. Here is an example of how to compile
+BUENOS, install the userland binary and boot the system.
+cd buenos
+gmake
+gmake -C tests/
+util/tfstool create store.file 2048 disk1
+util/tfstool write store.file tests/halt halt
+yamst -lu tty0.socket # (in another window, socket is in the main dir)
+yams buenos ’initprog=[disk1]halt’
+After running the above commands the BUENOS output should go to the window where you started yamst. The halt program merely shutdowns the system, thus YAMS should exit with the message "YAMS running...Shutting down
+by software request".Chapter 3
+Kernel Overview
+An operating system kernel is the core of any OS. The kernel acts as a glue between
+userland processes and system hardware providing an illusion of exclusive access to
+system resources. Each userland program is run in a private sandbox and processes
+should be able to interact only through well deﬁned means (system calls).
+The BUENOS kernel is threaded and can use multiple CPUs. The kernel provides
+threading and synchronization primitives. Several device drivers for the simulated
+devices of YAMS are also provided. Memory handling in the kernel is quite primitive
+as most virtual memory features are left as exercises. The system has a simple
+ﬁlesystem and support for multiple ﬁlesystems. Packet delivery networking is also
+supported, but no driver for the network interface is provided.
+Userland programs are somewhat supported, but proper system call handling as
+well as process bookkeeping are left as exercises.
+For an introduction on concepts of this chapter, read either [Tanenbaum] p.
+20–48 or [Stallings] p. 10–31, 48–51 and 54–76.
+3.1 Directory Structure
+The BUENOS source code ﬁles that make up one module are located in the same
+directory. The directories and their contents are as follows:
+init/
+Kernel initialization and entry point. This directory contains the functions that BUENOS will execute ﬁrst when it is booted. (See chapter 11 and
+Appendix A.)
+kernel/
+Thread handling, context switching, scheduling and synchronization. Also
+various core functions used in the BUENOS kernel reside here (i.e. kernel panic,
+kmalloc). (See chapter 4 and chapter 5.)
+proc/
+Userland processes. Starting of new userland processes, loading userland binaries and handling exceptions and system calls from userland. (See chapter 6.)
+vm/
+Virtual memory subsystem. Managing the available physical memory and
+page tables. (See chapter 7.)3.2. KERNEL ARCHITECTURE 9
+fs/
+Filesystem(s). (See chapter 8.)
+net/
+Networking subsystem. (See chapter 9.)
+drivers/
+Low level device drivers and their interfaces. (See chapter 10.)
+lib/
+Miscellaneous library code (i.e. string handling, random number generation).
+tests/
+Userland test programs. These are not part of the kernel. They can be used
+to test the userland implementation of BUENOS. (See chapter 6.)
+util/
+UNIX utilities for BUENOS usage. tfstool resides here. (See section 2.6.)
+doc/
+This document.
+3.2 Kernel Architecture
+While aiming for simplicity, the BUENOS kernel is still a quite complicated piece
+of software. The kernel is divided into many separate modules, each stored in a
+diﬀerent directory as was seen above.
+To understand how the kernel is built, we must ﬁrst see what it actually does.
+The kernel works between userland processes and machine hardware to provide
+services for processes. It is also responsible for providing the userland processes
+a private sandbox in which to run. Further, the kernel also provides various high
+level services such as ﬁlesystems and networking which act on top of the raw device
+drivers.
+A simpliﬁed view of the BUENOS kernel can be seen in Figure 3.1. At the top
+of the picture lies the userland and at the bottom is the machine hardware. Neither of these are part of the kernel, they just provide the context in which the
+kernel operates. The userland/kernel boundary as well as the hardware/software
+(hardware/kernel) interface are also marked in the picture.
+On the kernel side of these boundaries lies the important interface code. At
+the top, we can see the system call interface, which among other userland related
+functionality is documented in chapter 6. The system call interface is a set of
+functions which can be called from userland programs1
+. These functions can then
+call almost any function inside the kernel to implement the required functionality.
+Kernel functions cannot be called directly from userland programs to protect kernel
+integrity and make sure that the userland sandbox doesn’t leak.
+On the bottom boundary are the device drivers. Device drivers are pieces of code
+which know how to use a particular piece of hardware. Device drivers are usually
+divided into two parts: the top and bottom halves. The bottom half of a device
+driver is an independent piece of code which is run outside the kernel threading
+system whenever the hardware generates an interrupt (this piece of code is called
+1System calls are important part of any OS. Try reading manual pages of fork(2), wait(2),
+exec(2), read(2), write(2), open(2) and close(2) in any Unix system for an example of the real
+thing.10 CHAPTER 3. KERNEL OVERVIEW
+Virtual File System Packet Oriented Protocol
+Trivial File System Virtual memory
+Device drivers (top half)
+Device drivers (bottom half)
+Hardware
+Network
+Kernel services (threading, scheduling...)
+System call interface
+Userland Userland/kernel boundary
+BUENOS kernel
+Hardware/software interface
+Figure 3.1: BUENOS kernel overall architecture
+an interrupt handler). The top half of the device driver is a set of functions which
+can be called from within the kernel. The details of this, and description on how the
+device driver halves communicate with each other are documented in chapter 10.
+On top of the device drivers are various services which use device drivers. Two
+examples can be seen in the picture: the ﬁlesystem and the networking. The
+ﬁlesystem (see chapter 8) is actually accessed through a module called the virtual
+ﬁlesystem (see section 8.3), which abstracts diﬀerences between diﬀerent ﬁlesystems. The ﬁlesystem itself uses a disk device driver to access its permanent storage
+(the disk). Similarly the networking layer (see chapter 9), which uses network interface driver(s), provides tools for sending and receiving network packets. The
+packet oriented protocol module (POP, see section 9.2) uses the networking module
+to provide socket and packet port (similar to UDP ports in the Internet Protocol)
+functionality.
+3.2.1 Threading
+Now we have seen an overview of various kernel services, but we still don’t have
+anything which can call these service functions. The core of any kernel, including
+BUENOS, is its threading and context switching functionality. This functionality is
+sometimes called a kernel by itself. Threading is provided by a threading library (see
+chapter 4) in BUENOS. The threading system makes it possible to execute threads,
+separate instances of program execution. Each thread runs independently of each
+other, alternating their turns on the CPU(s). The context switching system is used
+to switch one thread out of a CPU and to put a new one on it. Threads themselves
+are unaware of these switches, unless they intentionally force themselves out of
+execution (go to sleep).
+Threads can be started by using the thread library. When starting a thread it
+is given a function which it executes. When the function ends, the thread dies. The
+thread can also commit suicide by explicitly killing itself. Threads cannot kill each
+other, murders are not allowed in the kernel (see exercises below). Each userland3.2. KERNEL ARCHITECTURE 11
+program runs inside one thread. When the actual userland code is being run, the
+thread cannot see the kernel memory, it can only access the system call layer.
+Threads can be pre-empted at any point, both in kernel and in userland. Preempting means that the thread is taken out of execution in favor of some other
+thread. The only way to prevent pre-empting is to disable interrupts (which also
+disables timer interrupts used to measure thread time-slices).
+Since the kernel includes many data structures and many threads are run simultaneously (we can have multiple CPUs), all data has to be protected from other
+threads. The protection can be done with exclusive access, achieved with various
+synchronization mechanisms documented in chapter 5.
+3.2.2 Virtual Memory
+In the much referenced Figure 3.1, there was one more subsystem which hasn’t been
+explained: the virtual memory (VM) subsystem. As the ﬁgure implies, it aﬀects
+the whole kernel, interacts with hardware and also with the userland.
+The VM subsystem is responsible for all memory handling operations in the
+kernel. Its main function is to provide an illusion of private memory spaces for
+userland processes, but its services are also used in the kernel. Since memory can
+be accessed from any part of the system, VM interacts directly with all system
+components.
+The physical memory usage in BUENOS can be seen in Figure 3.2. At the left
+side of the ﬁgure, memory addresses can be seen. At the bottom is the beginning
+of the system main memory (address zero) and at the top the end of the physical
+memory.
+The kernel uses part of this physical memory for its code (kernel image), interrupt handling routines and data structures, including thread stacks. The rest of the
+memory is at the mercy of the VM.
+As in any modern hardware, memory pages (4096 byte regions in our case)
+can be mapped in YAMS. The mapped addresses are also called virtual addresses.
+Mapping means that certain memory addresses do not actually refer to physical
+memory. Instead, they are references to a structure which maps these addresses to
+the actual addresses. This makes it possible to provide the illusion of exclusive access
+to userland processes. Every userland process has code at address 0x00001008, for
+example. In reality this address is in the mapped address range and thus the code
+is actually on a private physical memory page for each process.
+For more information on the virtual memory system and particularly on the
+various address ranges, see chapter 7.
+3.2.3 Support for Multiple Processors
+BUENOS is a multiprocessor operating system, with pre-emptive kernel threading.
+All kernel functions are thread-safe (re-entrant) except for those that are used only
+during the bootup process.
+Most code explicitly concerning SMP support is found in the bootstrap code
+(see chapter 11). Unlike in real systems, where usually only one processor starts at
+boot and it is up to it to start the other processors, in YAMS all processors will start
+executing code simultaneously and at the same address (0x80010000). To handle
+this, the procedure described in chapter 11 is used.
+Another place where the SMP support is directly evident is in the context switch
+code, and in the code initializing data structures used by the context switching
+code. Each processor must have its own stack when handling interrupts, and each
+processor has its own current thread. To account for these, the context switching
+code must know the processor on which it runs.12 CHAPTER 3. KERNEL OVERVIEW
+0x00010000
+KERNEL_ENDS_HERE
+static memory end
+0x00000000
+end of physical memory
+Dynamic memory allocated using pagepool
+Interrupt vectors
+Stack for OS initialization code
+BUENOS kernel image
+Memory allocated by kmalloc
+Figure 3.2: BUENOS memory usage. Addresses are physical addresses. Note that the
+picture is not in scale.3.3. KERNEL PROGRAMMING 13
+Finally, a warning: implementing all virtual memory exercises on a multiprocessor machine can be hard. It is suggested that for VM exercises, only one CPU
+is used2
+.
+Otherwise, the SMP support should be completely transparent. Of course it
+means that synchronization issues must be handled more carefully, but mostly everything works as it would on a single CPU system.
+3.3 Kernel Programming
+Kernel programming diﬀers somewhat from programming user programs. This section explains these diﬀerences and also introduces some conventions that have been
+used with BUENOS.
+3.3.1 Memory Usage
+The most signiﬁcant diﬀerence between kernel programming and programming of
+user programs is memory usage. In the MIPS32 architecture, which YAMS emulates,
+the memory is divided into segments . Kernel code can access all these segments
+while user programs can only access the ﬁrst segment called the user mapped segment. In this segment the ﬁrst bit of the address is 0. If the ﬁrst bit is 1, the
+address belongs to one of the kernel segments and is not usable in userland. The
+most important kernel segment in BUENOS is the kernel unmapped segment, where
+addresses start with the bit sequence 100. These addresses point to physical memory locations. In kernel, most addresses are like this. More information about the
+memory segments can be found in section 7.1.
+When initializing the system, a function (kmalloc) is provided to allocate memory in arbitrary-size chunks. This memory is permanently allocated and cannot
+be freed. Before initializing the virtual memory system kmalloc is used to allocate memory. After the initialization of the virtual memory system kmalloc can no
+longer be used. Instead, memory is allocated page by page from the virtual memory
+system. These pages can be freed later.
+3.3.2 Stacks and Contexts
+A stack is needed always when running code that is written in C. The kernel provides
+a valid stack for user programs so the programmer does not need to think about
+this. In kernel, however, nobody else provides you with a valid stack. Every kernel
+thread must have its own stack. In addition, every CPU must have an interrupt
+stack because thread stacks cannot be easily used for interrupt processing. If a
+kernel thread is associated with a user process, the user process must also have its
+own stack. BUENOS already sets up kernel stacks and interrupt stacks appropriately.
+Because the kernel and interrupt stacks are statically allocated, their size is
+limited. This means that large structures and tables cannot be allocated from
+stack. (The variables declared inside a function are stack-allocated.) Note also that
+recursive functions allocate space from the stack for each recursion level. Deeply
+recursive functions should thus not be used.
+Code can be run in several diﬀerent contexts. A context consists of a stack and
+CPU register values. In the kernel there are two diﬀerent contexts. Kernel threads
+are run in a normal kernel context with the thread’s stack. Interrupt handling code
+is run in an interrupt context with the CPU’s interrupt stack. These two contexts
+2The reasons become evident when the inner details of the VM subsystem are covered later.
+For the curious: the problem arises from the fact of having multiple TLBs, one for each CPU.
+(The TLB is a piece of hardware used to map memory pages.)14 CHAPTER 3. KERNEL OVERVIEW
+diﬀer in a fundamental way. In the kernel context the current context can be saved
+and resumed later. Thus interrupts can be enabled and blocking operations can be
+called. In the interrupt context this is not possible so interrupts must be disabled
+and no blocking operations can be called. In addition, if a kernel thread is associated
+with a userland process, it must also have a userland context.
+3.3.3 Library Functions
+BUENOS provides several library functions in the directory lib/. These include
+functions for string processing and random number generation. These functions are
+needed because standard C library cannot be linked with BUENOS. The prototypes
+of these functions can be found in lib/libc.h.
+3.3.4 Using a Console
+In the kernel, reading from and writing to the console is done by using the polling
+TTY driver. The kprintf and kwrite functions can be used to print informational messages to the user. Debug printing should be handled with the DEBUG
+function. This way debug messages can be easily disabled later when they are no
+longer needed. Userland console access should not be handled with these functions. The interrupt driven TTY driver should be used instead. See the example
+in init/main.c.
+3.3.5 Busy Waiting
+In the kernel, special attention has to be given to synchronization issues. Busy
+waiting must be avoided whenever possible. The only place where busy waiting is
+acceptable is the spinlock implementation, which is already done for you. Because
+spinlocks use busy waiting, they should never be held for a long time.
+3.3.6 Floating Point Numbers
+YAMS does not support ﬂoating point numbers so they cannot be used in BUENOS
+either. If an attempt to execute a ﬂoating point instruction is made, a co-processor
+unusable exception will occur. (The ﬂoating point unit is co-processor 1 in MIPS32
+architecture.)
+3.3.7 Naming Conventions
+Some special naming conventions have been used when programming BUENOS. These
+might help you ﬁnd a function or a variable when you need it. Functions are
+generally named as filename function where filename is the name of the ﬁle
+where the function resides and function tells what the function does. Variables
+are named similarly filename variable.
+3.3.8 Debug Printing
+Sometimes it is usefull to be able to print debugging information from the kernel. A
+function which uses the polling TTY driver is provided for such printing. Because
+polling TTY driver is used, printing is possible from all parts of the kernel. Note
+that printing with the polling driver slows the system down considerably and also
+changes system timings which may cause trouble when debugging a SMP system.EXERCISES 15
+void DEBUG (char *debuglevelname, char *format, ...)  If debuglevelname has been given to the kernel as a boot argument, prints
+debug information. If not, ignores the debug printing.  format and other arguments are given as for printf().
+3.3.9 C Calling Conventions
+Normally C compiler handles function calling conventions (mostly argument passing) transparently. Sometimes in kernel code the calling convention issues need to
+be handled manually. Manual calling convention handling is needed when calling C
+routines from a assembly program or when manipulating thread contexts in order
+to pass arguments to starting functions.
+Arguments are passed to all functions in MIPS argument registers A0, A1, A2
+and A3. When more than 4 arguments are needed, the rest are passed in the stack.
+The arguments are put into the stack so that the 1st argument is in the lowest
+memory address.
+There is one thing to note: the stack frame for arguments must always be
+reserved, even when all arguments are passed in the argument registers. The frame
+must have space for all arguments. Arguments which are passed in registers need
+not to be copied into this reserved space.
+3.3.10 Kernel Boot Arguments
+YAMS virtual machine provides a way to pass boot arguments from the host operating system to the booted kernel. BUENOS supports these arguments. Please see
+Appendix A for details.
+Exercises
+3.1. In BUENOS, a thread that is ready to be run will be run on whichever processor
+ﬁrst removes it from the scheduler’s ready list. This can cause the thread to
+bounce from processor to processor on every timeslice. This behavior is also
+present in real operating systems, e.g. Solaris. Why might this behavior not
+be a good idea?
+3.2. In BUENOS threads cannot kill each other. There are many reasons for this,
+try to ﬁgure out as many as you can.Chapter 4
+Threading and Scheduling
+This chapter describes the threading system implemented in BUENOS. The kernel
+can run multiple threads and schedule them across any number of CPUs the system
+happens to have.
+The threading system contains three major parts: thread library, scheduler and
+context switching code. Each of these components is thoroughly explained below
+in their own sections.
+The thread library contains functions for thread creation, running and ﬁnishing
+(dying). It also implements the system wide table of threads.
+Scheduler handles the allocation of CPU time for runnable threads.
+Context switch code is executed when an exception (trap or interrupt) occurs.
+Its purpose is to save and restore execution contexts (CPU register states, memory
+mappings etc.) of threads.
+The context switching part is the most complicated and most hardware dependent part of the threading system. It is not necessary to understand it fully to be
+able to understand the whole threading system. However, it is essential to see the
+purpose of all these three parts.
+For an introduction to these concepts, read either [Stallings] p. 108–123, 154–
+161, 394–407 and 438–449 or [Tanenbaum] p. 81–100 and 132–145.
+4.1 Threads
+BUENOS kernel supports multiple simultaneously running threads. One thread can
+be run on each available CPU at a given moment. Information on existing threads
+is stored in a ﬁxed size table thread table. The structure of the table is described
+in detail in section 4.1.1.
+Threads and thread table are handled through a collection of library functions,
+that will do all necessary manipulation of the data structures. They will also take
+care of concurrency. Thread handling functions are described in section 4.1.2.
+State diagram of BUENOS threads is presented in Figure 4.1. States in detail are
+described below:  FREE indicates that this row in thread table is currently unused.  RUNNING threads are currently on CPU. In case of multiple CPUs, several
+threads may have this state.  READY threads are on the scheduler’s ready list and can be switched to
+RUNNING state.4.1. THREADS 17
+DYING RUNNING
+FREE NONREADY READY
+SLEEPING
+Figure 4.1: BUENOS thread states and possible transitions  SLEEPING threads are not on CPU and are in sleep queue. Sleeping threads
+are waiting for some resource to be freed. When access to the resource is
+granted, the thread is waken up and switched to READY state.  NONREADY threads have been created, but are not yet marked to be
+runnable. The state is switched to READY when the function thread run()
+is called.  DYING threads have cleaned themselves up, but are still on CPU. The scheduler should mark them FREE when encountered.
+4.1.1 Thread Table
+Thread table contains all necessary information about threads. This information
+consists of:  context of the thread, when it was running.  state of the thread. The state is used mostly by the scheduler, when deciding
+which thread will be run next.  pagetable of the thread. Each thread will have its own virtual memory mappings, so also own pagetables are needed.
+All records and datatypes of thread table are described in Table 4.1.
+Thread table is a ﬁxed size (compile time option) structure, which has one line
+for each thread. Threads are referenced by thread IDs (TID t), which corresponds
+to index to the thread table. The size of the table is deﬁned in kernel/config.h
+by deﬁnition CONFIG MAX THREADS.
+The thread table is protected by a single spinlock (thread table slock). The
+lock must be a spinlock, because it is used in contexts where threads cannot be
+switched for waiting (eg. in scheduler).
+The thread table is initialized by calling thread table init() function, which
+will set all thread states to FREE.
+4.1.2 Thread Library
+Thread library provides functions for thread handling.
+Thread Creation Functions
+Threads can be manipulated by following functions implemented in kernel/thread.c:18 CHAPTER 4. THREADING AND SCHEDULING
+Type Name Explanation
+context t * context Space for saving thread
+context. Context consists of
+all CPU registers, including
+the program counter (PC)
+and the stack pointer (SP).
+This pointer always refers to
+the thread’s stack area.
+context t * user context Pointer to this thread’s
+context in userland. Field is
+NULL for kernel only
+threads.
+thread state t state The current state of the
+thread. Valid values are:
+FREE, RUNNING, READY,
+SLEEPING, NONREADY and
+DYING.
+uint32 t sleeps on If nonzero, tells which
+resource the thread is
+sleeping on (waiting for).
+Nonzero value also indicates
+that the thread is in some list
+in sleep queue. Note that the
+thread might still be running
+and in middle of the process
+to go sleeping (in which case
+its state is RUNNING.)
+pagetable t * pagetable Pointer to the virtual
+memory mapping for this
+thread. This entry is NULL if
+the thread does not have a
+page table.
+process id t process id Index to the process entry.
+This ﬁeld is currently unused,
+but thread creation sets this
+to a negative value.
+TID t next Pointer to next thread in this
+list. Used for forming lists of
+threads (ready to run list,
+sleep queue). If this is the
+last thread of a list, the value
+is negative.
+uint32 t dummy alignment ﬁll[9] This is needed because
+thread table entries are
+expected to be 64 bytes long
+(by context switch code). If
+new ﬁelds are added or old
+ones are removed this
+alignment should also be
+corrected in a proper way.
+Table 4.1: Fields in thread table record4.1. THREADS 19
+TID t thread create (void (*func)(uint32 t), uint32 t arg)  Creates a new thread by allocating a slot from thread table. PC in this
+thread’s context is set to the beginning of the func and parameters are saved
+to the proper registers in context. The context is saved in the stack area of the
+newly created thread. When the scheduler decides to run this thread, context
+is restored and it looks like function func would have been called. The return
+address of the context is set to beginning of the function thread finish.  Returns the thread ID of the created thread. If the return value is negative,
+thread could not be created. The possible reasons for failure are: full thread
+table and virtual memory shortage.  The argument arg is passed to the func which is called when the new thread
+starts after a call to thread run().
+void thread run (TID t t)  Calls scheduler add ready(t), which sets the thread state to READY and
+adds the thread to the ready-to-run list.
+Self Manipulation Functions
+The following functions can be used by a thread to manipulate itself:
+void thread switch (void)  Perform voluntary context switch. Scheduler will later add the thread to
+ready to run list if the thread is not sleeping on something (sleeps on is
+zero). Context switch is performed by causing the software interrupt 0 which
+is handled the same way as the context switch. Interrupts are enabled before
+raising the software interrupt, since otherwise the switch might not happen.
+The interrupt state is restored before returning from this function.  Note that there is also a macro called thread yield which points to this
+function. Since yielding is mechanically equivalent to switching, the implementation is the same. The name yielding is used when the yield has no
+actual eﬀect, switching is used when something actually happens (thread goes
+to sleep).
+void thread finish (void)  Commit suicide. The thread calling this function will terminate itself and free
+its resources (stack and thread table entry). The thread marks its state to be
+DYING. The row in thread table is later freed in the scheduler.  If a pagetable has been reserved for this thread it must be freed before calling
+thread finish.
+TID t thread get current thread (void)  Returns the TID of the calling thread.
+kernel/thread.c,
+kernel/thread.h
+Thread library
+kernel/ interrupt.s,
+kernel/interrupt.h
+Interrupt mask setting functions20 CHAPTER 4. THREADING AND SCHEDULING
+4.2 Scheduler
+Scheduler is a piece of code that allocates CPU time for threads. The basic BUENOS
+scheduler is pre-emptive and allocates CPU time in a round robin manner. Threads
+do not have priorities. Even threads currently in kernel can be interrupted when
+their time slice has been spent. This can be prevented by disabling interrupts.
+The timeslice allocated for a thread is deﬁned in kernel/config.h and the name
+of the conﬁguration variable is CONFIG SCHEDULER TIMESLICE. The value deﬁnes
+how many CPU cycles a thread can use before it will be interrupted and next
+thread will be selected for running. Timeslice includes the time spent in context
+restoring, so it must be at least 250 cycles to guarantee that the thread will get at
+least some real processing done. The actual timeslice length is determined randomly
+and is at least the conﬁgured number of ticks, see Appendix A.
+Scheduler works by maintaining a global scheduler current thread table of
+current threads (one per CPU). It also has a list of ready threads, maintained in
+the local list variable scheduler ready to run. The actual implementation of the
+ready list is two indexes. One points to the beginning of the list in thread table and
+the other to the end. A negative value in both head and tail indicates an empty
+list.
+The whole scheduler is locked by one spinlock to prevent multiple CPUs entering
+the scheduler at the same time. Interrupts are always disabled when scheduler
+is running, because it is called only from interrupt and exception handlers. The
+spinlock used is thread table slock and it also controls the access to the thread
+table.

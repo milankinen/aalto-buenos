@@ -129,7 +129,7 @@ void test_create() {
     /*create a lots of files*/
     int i;
     char FILEPATH2[] = "[disk1]hauki";
-    for (i = 0; i < 15; i++) {
+    for (i = 0; i < 13; i++) {
         FILEPATH2[8]++;
         return_value = syscall_create(FILEPATH2, 512);
         assert(0, return_value, "test_create_6_failed\n");
@@ -168,7 +168,7 @@ void test_complex() {
     int filehandle = syscall_join(PID);
     assert(0, MIN(0, filehandle), "test_complext_1_failed\n");
     int return_value = syscall_write(filehandle, text, strlen(text));
-    assert(VFS_NOT_FOUND, return_value, "test_complex2_failed\n");
+    assert(VFS_NOT_FOUND, return_value, "test_complex2_failed");
 
     return_value = syscall_read(filehandle, text, 3);
     assert(VFS_NOT_FOUND, return_value, "test_complex3_failed\n");

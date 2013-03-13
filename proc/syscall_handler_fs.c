@@ -33,9 +33,18 @@ openfile_t syscall_handle_open(const char *filename) {
 
     process_table_t *pt = get_current_process_entry();
     int i;
+    thread_table_t *t = thread_get_current_thread_entry();
+    pagetable_t *p = t->pagetable;
+    char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
+    if (read_string_from_vm(p, filename, temp,
+            VFS_PATH_LENGTH)==RETVAL_SYSCALL_HELPERS_NOK) {
+        kprintf("Process was killed\n");
+        syscall_handle_exit(0);
+        return -1;
+    }
     for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {
         if (pt->filehandle[i] == FILEHANDLE_UNUSED) {
-            int filehandle = vfs_open((char*) filename);
+            int filehandle = vfs_open((char*) temp);
             if (filehandle < 0) {
                 return filehandle;
             }
@@ -105,7 +114,7 @@ int syscall_handle_read(openfile_t filehandle, void *buffer, int length) {
 
             /*check for exceptions */
             if (readed < 0) {
-                return readed;
+                return VFS_ERROR;
             }
 
         }
@@ -171,16 +180,15 @@ int syscall_handle_create(const char *filename, int size) {
     thread_table_t *t = thread_get_current_thread_entry();
     pagetable_t *p = t->pagetable;
     char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
-    if (strlen(filename) > VFS_PATH_LENGTH) {
-        return VFS_INVALID_PARAMS;
-    }
-    if (read_data_from_vm(p, filename, temp,
-            strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
+    if (read_string_from_vm(p, filename, temp,
+            VFS_PATH_LENGTH)==RETVAL_SYSCALL_HELPERS_NOK) {
         kprintf("Process was killed\n");
         syscall_handle_exit(0);
         return -1;
     }
-
+    if (strlen(filename) > VFS_PATH_LENGTH) {
+        return VFS_INVALID_PARAMS;
+    }
     return vfs_create(temp, size);
 }
 
@@ -188,14 +196,14 @@ int syscall_handle_delete(const char *filename) {
     thread_table_t *t = thread_get_current_thread_entry();
     pagetable_t *p = t->pagetable;
     char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
-    if (strlen(filename) > VFS_PATH_LENGTH) {
-        return VFS_INVALID_PARAMS;
-    }
     if (read_data_from_vm(p, filename, temp,
             strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
         kprintf("Process was killed\n");
         syscall_handle_exit(0);
         return -1;
+    }
+    if (strlen(filename) > VFS_PATH_LENGTH) {
+        return VFS_INVALID_PARAMS;
     }
 
     return vfs_remove(temp);

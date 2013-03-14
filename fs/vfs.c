@@ -648,6 +648,7 @@ int vfs_close(openfile_t file) {
     openfile = vfs_verify_open(file);
 #ifdef CHANGED_2
     if (openfile == NULL ) {
+        semaphore_V(openfile_table.sem);
         return VFS_ERROR;
     }
 #endif
@@ -692,6 +693,7 @@ int vfs_seek(openfile_t file, int seek_position) {
     openfile = vfs_verify_open(file);
 #ifdef CHANGED_2
     if (openfile == NULL ) {
+        semaphore_V(openfile_table.sem);
         return VFS_ERROR;
     }
 #endif

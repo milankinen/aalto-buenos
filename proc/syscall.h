@@ -158,4 +158,8 @@ int syscall_handle_delete(const char *filename);
 #define FILEHANDLE_STDOUT 1
 #define FILEHANDLE_STDERR 2
 
+#ifdef CHANGED_2
+#define FILEHANDLE_ILLEGAL -505
+#endif
+
 #endif

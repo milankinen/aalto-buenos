@@ -71,8 +71,9 @@ openfile_t syscall_handle_open(const char *filename) {
 int syscall_handle_close(openfile_t filehandle) {
     int i;
     int filehandle_found = -1;
-    if (filehandle <= 0)
-        return 0;
+    /* illegal filehandle */
+    if (filehandle < 0)
+        return FILEHANDLE_ILLEGAL;
     process_table_t *pt = get_current_process_entry();
     /*try to find the filehandle and close it */
     for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {
@@ -91,6 +92,9 @@ int syscall_handle_close(openfile_t filehandle) {
 
 int syscall_handle_seek(openfile_t filehandle, int offset) {
 
+    /* illegal filehandle */
+    if (filehandle < 0)
+        return FILEHANDLE_ILLEGAL;
     process_table_t *pt = get_current_process_entry();
 
     if (check_filehandle(filehandle, pt) == VFS_NOT_OPEN) {
@@ -101,6 +105,9 @@ int syscall_handle_seek(openfile_t filehandle, int offset) {
 }
 
 int syscall_handle_read(openfile_t filehandle, void *buffer, int length) {
+    /* illegal filehandle */
+    if (filehandle < 0)
+        return FILEHANDLE_ILLEGAL;
     char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
     thread_table_t *t = thread_get_current_thread_entry();
     pagetable_t *p = t->pagetable;
@@ -150,6 +157,9 @@ int syscall_handle_read(openfile_t filehandle, void *buffer, int length) {
 }
 
 int syscall_handle_write(openfile_t filehandle, const void *buffer, int length) {
+    /* illegal filehandle */
+    if (filehandle < 0)
+        return FILEHANDLE_ILLEGAL;
     thread_table_t *t = thread_get_current_thread_entry();
     pagetable_t *p = t->pagetable;
     process_table_t *pt = get_current_process_entry();

@@ -1,0 +1,149 @@
+Phase 2 testcase documentation
+===============================
+Group 3
+Lauri Hartikka, 79956E
+Jaakko Hujanen, 78842N
+Matti Lankinen, 82105H
+
+
+Running tests
+==============
+
+We have implemented two different types of testing: (1) test suite based
+testing and (2) “adventure” testing. Both test types focus on testing
+system calls and try to break the kernel. We don’t have tests for our
+userland programs since kernel testing was our top priority.
+
+Tests can be run with following commands:
+
+- Run test suite
+    sh startprog.sh run_all_tests
+- Run adveture testing (ATTENTION: see description below!!!)
+    sh startprog.sh test_adventure
+- Run shell (test interactively foreground/background processes of created
+  programs)
+    sh startprog.sh shell
+
+
+
+Test cases
+===========
+
+Test suite based tests
+-----------------------
+
+These tests are targetted to specific system calls and their usage. Tests are
+designed by knowing the specific details of tested system calls. Tests try
+to validate that (1) system calls work as expected; (2) there is no way to
+cause kernel panics from userland / with system calls. Test suite is divided
+into following tests:
+
+Process related system call tests (test_proc executable):
+
+- basic: Test basic executable starting, joining and exit.
+- nochild: Test joining with child that don’t exist.
+- maxprocs: Test creating more processes than our process table can maintain
+- nofile: Try to start a process from file that doesn’t exist
+- invldexe: Try to start a process from executable that is not valid.  
+
+
+Filesystem related system call tests (test_fs_syscall executable):
+  
+The methods test_open_close(), test_read(), test_write(), test_create()
+andtest_delete() tests the basic operations regarding the file system
+operations.
+
+The test_complex() spawns new processes using the ‘write’ executable and
+checks that processes can’t write to file handles owned by other processes.
+
+
+Kernel panic tests (test_panic executable):
+
+- stack: Try to reserve stack more than is allowed
+- krnlLdaddr: Try to load memory block from kernel address
+- krnlSaddr: Try to store memory block to kernel address
+- nullLdaddr: Try to load memory block from null address
+- nullSaddr: Try to store memory block to null address
+- rndLdaddr: Try to load memory block from random addresses
+- rndSaddr: Try to store memory block to random addresses
+- frmViolat: Try to violate stack frame of main() function
+- jmpKernel: Try to write a kernel address to function return address
+- negArgc: Try to call execp with negative arguments
+- manyArgc: Try to call execp with argc > len(argv)
+- nullArgv: Try to call execp with argv == null
+- noTermArgv: Try to call execp with argv which has no ‘\0’ character
+- krnlArgv: Try to call execp with argv == kernel address
+
+
+Adventure testing
+-------------------
+
+This test tries to call all existing (and non-existing ;) system calls with
+different values. These values can be either valid or invalid for the executed
+system call. The used values are following:
+
+ 1) NULL
+ 2) large string (bigger than our read buffer size)
+ 3) string without ‘\0’ terminator
+ 4) “foobar”
+ 5) “[disk1]test_join” (real executable/file name)
+ 6) kernel address
+ 7) 1
+ 8) -1
+ 9) 0xffffffff
+10) 1337
+11) char** pointing to static string address
+
+By using these values, all possible system call parameter combinations are
+formed by using inner loops. This means that we have 11^3 = 1131 test cases
+per system call, we have also added two pseudo system call numbers: 0x237
+and 0x0, so that we have 14 system calls totally.
+
+This means that our adventurer executes ~19k test cases. Each test case is
+started as separate process and this process is joined in test_adventure
+executable. If system call kills the process, it doesn’t matter, the next
+one will be launched right after the previous has been joined.
+
+This test just tries to ensure that our kernel doesn’t panic even with
+weird input combinations. The running of this adventure test takes about XX
+hours in our developing environments so run it with extra caution.
+
+
+
+Shell and Userland programs
+=================
+
+Start shell by invoking startprog.sh with argument shell. Shell starts and
+different programs can be tried out. E.g
+
+    > touch testfile
+
+will create empty file testfile. You can add text to a file with command
+append (see note below on append usage). Then you can check what is in the
+file with command
+
+    > cat testfile
+
+Our version of cat supports only one argument. There are also two ready made
+text files test.txt and bigfile.txt.
+
+    > append file.txt text_to_be_written
+
+Contrary to the name of executable, the append program just (over)writes the
+given text to the given file starting from the beginning of the file. Also
+the text cannot contain any spaces. The following fails:
+
+    > append file.txt “an example string”
+
+due to properties of the shell. See documentation of the shell.
+
+The ready made programs are:
+    - halt
+    - test_join
+    - test_panic
+    - test_fs_syscall
+    - write
+    - shell
+    - cat
+    - touch
+    - append

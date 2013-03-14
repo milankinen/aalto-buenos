@@ -1,0 +1,434 @@
+Phase 2 assignment documentation
+=================================
+Group 3
+Lauri Hartikka, 79956E
+Jaakko Hujanen, 78842N
+Matti Lankinen, 82105H
+
+
+Assignment 1: Data transfer
+--------------------------------------------
+
+Modified files:
+  - vm/vm.h
+  - vm/vm.c
+  - proc/syscall.h
+  - proc/syscall_helpers.c
+
+First we implemented a basic helper which checks whether given virtual
+address is in current thread’s page table or not. If the virtual
+address exists, then the function also tells the virtual and physical
+page start offsets to the caller. This function is inside module vm/vm.c
+
+Then we created three helper methods to module proc/syscall_helpers.c
+(signatures in proc/syscall.h).
+  + int read_string_from_vm(pagetable_t* pagetable, const char*
+        virtual_source, char* physical_target, int max_length);
+  + int read_data_from_vm(pagetable_t* pagetable, const void*
+        virtual_source, void* physical_target, int size);
+  + int write_data_to_vm(pagetable_t* pagetable, const void*
+        physical_source, void* virtual_target, int size);
+
+These three functions assume that the given physical source/target
+is allocated properly and it is safe to write. The functions perform
+checks for virtual addresses and if checks fail, the functions return
+RETVAL_SYSCALL_HELPERS_NOK.
+
+Actual system call handlers reserve a static block (char tmp[SZ]) when
+they are handling userland data and use that static block in their
+data transfer (e.g. files -> block -> userland; userland -> block ->
+files/kernel mem). Because we are using kernel reserved memory from stack,
+we don’t need to lock page tables during userland read/write operands
+at this point (we have no malloc). When reading strings, then there is
+a maximum length for transferred string (512 chars). If this length is
+exceeded, then RETVAL_SYSCALL_HELPERS_NOK is returned.
+
+If system call handlers read RETVAL_SYSCALL_HELPERS_NOK status correctly,
+then it should be impossible for userland program to write/read from
+memory that is not allowed for it.
+
+
+
+Assignment 2: Process entries
+--------------------------------------------
+
+Modified files:
+  - proc/process.h
+  - proc/process_table.h
+  - proc/process.c
+  - kernel/thread.h
+  - kernel/thread.c
+
+Here is our process table entry structure:
+
+process_table_t:
+    TID_t tid;
+    char name[PROCESS_NAME_MAX_LENGTH];
+    PID_t next;
+    cond_t* die_cond;
+    lock_t* die_lock;
+    int retval;
+    PID_t parent_pid;
+    PID_t last_child_pid;
+    int filehandle[MAX_OPEN_FILES_PER_PROCESS];
+
+
+- tid: Process’s thread ID running the process, if tid == -1 then
+    process entry is not running.
+- name: Name of the process, truncated from executable filename
+- next: If process is a child process, then its parent’s children will
+    be linked by using this field (needed when making child processes orphan
+    in EXIT)
+- die_cond, die_lock: Needed for die monitoring: when process is about
+    to die then it signals possible waiting parent that “hey, i’m dead”
+- retval: Process’s return value after exit.
+- parent_pid: Needed for process relation identification.
+- last_child_pid: Starting point of process’s child process list.
+- filehandle: A static table containing the open filehandles of the
+    process
+
+We have also a static process table which is initialized during kernel
+startup with same way as thread table. Process table initialization
+function code remains in module proc/process.c.
+
+We have also added one field to thread table entries: userland_pid,
+which links back to process table indexes (one requirement of this
+assignment). Definition and implementation of this field is in
+kernel/thread.h and kernel/thread.c.
+
+ATTENTION: entry fields ‘tid’ and ‘parent_pid’ have very important
+role when defining process states. The states define, when a process
+entry is ready for reuse, thus our process table will be managed by
+itself by these states.
+  1) if TID == -1 and PARENT_ID == -1 then process entry is *free*,
+     meaning that it is ready to be assigned to new processes
+  2) if TID != -1 and PARENT_ID == -1 then process entry is *orphan*,
+     meaning that it has no parent process. Process return value is not used
+     anymore so process entry is ready to be assigned to new processes as
+     soon as process dies.
+  3) if TID == -1 and PARENT_ID != -1 then process entry is *zombie*,
+     meaning that it is dead but its return value is not requested
+     yet. Process ready to be assigned to new processes as soon as return
+     value is readed or parent process dies.
+  4) if TID != -1 and PARENT_ID != -1 then process entry is *running*
+
+The handling of above states is described more detailed in process
+related system call descriptions (below).
+
+
+
+Assignment 3: System calls
+--------------------------------------------
+
+Important note about avoiding kernel panics: We have tried to minimize the
+kernel panic situations by removing all KERNEL_ASSERT and KERNEL_PANIC
+blocks from userland related kernel codes. Instead, we return error
+codes and those error codes causes allocated resources to be freed and
+execution to go back to userland. If userland process can’t continue
+its running, then the process is killed with a proper exit code by using
+exit syscall handler.
+
+We have modified existing functions from following files:
+  - vm/vm.c (return values instead of panics)
+  - fs/vfs.c (return error codes instead of panics)
+  - proc/process.c (return values instead of panics)
+  - proc/exception.c (replaced userland exception panics
+    sycall_exit(errcode)
+  - proc/syscall.c (return values to userland instead of panics)
+  
+  
+
+
+EXEC(P)
+--------
+
+Modified files:
+  - proc/syscall.h
+  - proc/process.c
+  - proc/syscall.c
+  - proc/syscall_handler_proc.c
+
+Exec and execp methods are implemented in same place because only
+difference between those is that EXECP has argc > 0 whereas EXEC has
+argc == 0.
+
+Parameter and filename passing is handled in module proc/syscall.c where
+we have created a method:
+  + void handle_execp(context_t *user_context, thread_table_t *my_entry);
+
+This method does the safe parsing of our arguments to the static memory
+block in stack (see assignment 1 declaration). During the parsing, argv
+string pointers are assigned also to a local kernel reserved static
+array. If anything goes wrong in parsing, then -1 is returned to the
+userland. This array is fixed to size 32 so our syscall supports max 32
+arguments. When this function is ready, then we have a safe pointer of
+argument strings and a safe filename string.
+
+When the arguments have been parsed, they are
+transferred to the syscall_handle_execp-function (in module
+proc/syscall_handler_proc.c). This function creates a suitable data block
+from arguments and parent process information and starts a new thread &
+passes a pointer to the data block. The data block has a ready-status
+which is monitored right after new thread is created. New thread changes
+the ready status and signals the waiting thread to continue when child
+process creation is ready.
+
+Our new thread gains the access to given data block with pointer
+argument. Then it calls immediately our modified start_process()-function
+(in module proc/process.c) with the modified data block pointer. Our
+modified start_process() first locks the monitor lock (gained from parent
+process) and searches for a new process entry from the process table. When
+a new entry has been found, it is initialized and then original process
+initialization code is run (file openings, code readings, pagetable
+allocating and tlb filling). If anything goes wrong, then process table
+entry is freed, lock is released and parent process monitor is signaled.
+
+Finally when the process data is reserved, then the system call arguments
+are constructed into child process memory. In this section, the code
+adds the filename of the executable to the first argument (so that
+child process has ALWAYS >= 1 arguments). Construction is done to child
+process’s stack memory by using memcopy() and manually decrementing
+child process’s SP register. In MIPS, stack must be 4-bytes aligned
+so the construction code handles the correct byte padding. In the end,
+arguments are stored into child process’s userland memory space and
+pointers are set to A0 and A1 registers.
+
+Just before the thread goes to userland, it informs its process id to the
+data block, sets the block’s ready status to true, signals the parent
+process thread and releases the sync lock. After that, parent process
+gains the child process id (or error code) from block and continues its
+execution back to the userland.
+
+
+EXIT
+--------
+
+Modified files:
+  - proc/syscall.h
+  - proc/syscall.c
+  - proc/syscall_handler_proc.c
+
+Exit system call does not need any special input parameter
+parsing. Syscall handler (in module proc/syscall.c) calls the function:
+  void syscall_handle_exit(int retval); (in module
+         proc/syscall_handler_proc.c)
+
+First it locks the process’s die monitor lock. After that it just
+ 1) frees the page table,
+ 2) marks all its child processes (if any) to orphans,
+ 3) ensures that return value is positive and sets it to the corresponding
+    process table entry’s retval field,
+ 4) signals its die monitor in the case that processes parent is waiting
+    (joining) the return value.
+
+Then it marks the entry’s TID value to -1, which indicates that
+process is not running anymore. In the end, the thread kills itself with
+thread_kill() method.
+
+
+JOIN
+--------
+
+Modified files:
+  - proc/syscall.h
+  - proc/syscall.c
+  - proc/syscall_handler_proc.c
+
+
+Join system call does not need any special input parameter
+parsing. Syscall handler (in module proc/syscall.c) calls the function:
+  int syscall_handle_join(PID_t pid); (in module
+        proc/syscall_handler_proc.c)
+
+This function does the following actions:
+  1) Checks that given child process id exists and the current process
+     has child entry with the given id (process IDs are just process table
+     indices). If the ownership is not correct, then a negative value is
+     returned.
+  2) Locks the CHILD PROCESS’s die monitor lock.
+  3) Starts to monitor child process’s TID (running status), if child
+     process is running (TID != -1) then it starts to wait the monitor.
+  4) When child process finishes its execution, it signals the die
+     monitor (see EXIT syscall explanation above) and wakes this process
+  5) THIS PROCESS reads the return value from the child process table
+     entry
+  6) THIS PROCESS marks the child process as ORPHAN, if child processes
+     are zombies, they their entries are free and ready for new process
+     creations
+  7) Finally this process releases the childs die monitor lock returns
+     the read child’s return value to userland
+
+
+
+FILESYSTEM RELATED SYSTEM CALLS IN GENERAL
+------------------------------------------
+Modified files:
+  - proc/syscall.h
+  - proc/syscall.c
+  - proc/syscall_handler_fs.c
+  - fs/vfs.c
+
+Safe data transfer is used in file system syscalls as explained in the
+Data Transfer section. The process is always killed if it tries to access
+invalid locations of the memory. The buffer when reading and writing in
+blocks is taken from kernel stack.
+
+Each process has a static list containing the open file handles. Free
+entries are marked with -1. Always when a file system call is executed
+that takes a filehandle as a parameter, it is checked that the process
+owns the given filehandle. Respectively, when syscall_open is executed,
+it is confirmed that the process specific filehandle table has room for
+a new entry.
+
+All the file syscalls calls the respective functions declared in
+vfs.c. Changes made to vfs.c included the removal of the kernel panics
+and specifying the stdin, stdout and stderr fixed filehandles.
+
+OPEN
+--------
+returns:
+- FILEHANDE_ILLEGAL if the filehandle is invalid
+- VFS_ERROR in case of other ERROR
+- The open file handle in case of success
+
+
+CLOSE
+--------
+returns:
+- FILEHANDE_ILLEGAL if the filehandle is invalid
+- VFS_OK in case of success
+- VFS_NOT_FOUND if the given file handle was not open for the process
+
+
+READ
+--------
+Reading is done with block sizes define by
+CONFIG_SYSCALL_MAX_BUFFER_SIZE. The special case is filehandle 0 when
+the data is read from stdin.
+returns:
+- FILEHANDE_ILLEGAL if the filehandle is invalid
+- VFS_NOT_FOUND if the process does not have the filehandle
+- VFS_ERROR if error occurred during the reading
+- Readed bytes in case of success
+
+WRITE
+--------
+Writing is done with block sizes define by
+CONFIG_SYSCALL_MAX_BUFFER_SIZE. The special case is filehandle 1 when
+the data is written to stdin.
+returns:
+- FILEHANDE_ILLEGAL if the filehandle is invalid
+- VFS_NOT_FOUND if the process does not have the filehandle
+- VFS_ERROR if error occurred during the reading
+- Written bytes in case of success
+
+CREATE
+--------
+returns:
+- VFS_INVALID_PARAMS if filename is invalid.
+- Other VFS specific negative value in error case
+- VFS_OK in case of success
+
+DELETE
+--------
+returns:
+- VFS_INVALID_PARAMS if filename is invalid.
+- Other VFS specific negative value in error case
+- VFS_OK in case of success
+
+SEEK
+--------
+returns:
+- VFS_NOT_FOUND if filehandle is not found
+- Other VFS specific negative value in error case
+- new seek position in case of success
+
+
+Assignment 4: Shell
+--------------------------------------------
+In this assignment we created shell, a program to run other programs
+interactively. The following files were created or modified:
+    - tests/shell.c
+    - tests/str.c and tests/str.h
+    - tests/lib.c and tests/lib.h
+
+where shell.c contains the source code for the shell and str.* and lib.*
+are copies of some functions in lib/ folder. Those function were used
+in the implementation of the shell.
+
+The shell supports starting programs in foreground or in
+background. Normal foreground process is started by invoking
+
+command arg1 arg2 …
+
+By adding & sign at the end of the command starts the program in the
+background:
+
+    command arg1 arg2 … &
+
+The shell parses the command by reading standard input character by
+character and echoing written character for writer to see. Then the
+whole command is stored in a buffer as C null ended string. The buffer
+is of fixed length and if this length is exceeded, shell will produce a
+too long line error after which user can continue using the shell. When
+a successful read has been done the parsing continues. The buffer is
+scanned from start to end and from each non-white character a command
+or an argument is recognized. This first non-white character of each
+argument (we will from now consider the command as the zeroth argument)
+is then pointed from a data structure. This data structure is called
+argv and is collection of pointers to C strings. This argv is used by
+the syscall_execp and is the same form as the argv of C main function
+declaration, hence the name.
+
+Since the argv of C main function assumes null ended strings and our
+pointed “strings” are separated by whitespace, we need to somehow
+“transform” the whitespace separated arguments in the buffer. Our
+solution was to change the first whitespace after each argument to
+C string ending character, ‘\0’. Now, each argument pointer in
+the argv is null ended which makes the argv data structure conform to
+syscall_execp.
+
+Furthermore, we need to keep track of the number of arguments in argv. It
+is stored in an int called argc. In the end the argc and argv might look
+the following
+
+    argc: 2,
+    argv: {pointer to “command”, pointer to “arg”, null}
+
+    buffer:
+    {‘c’,’o’,’m’,’m’,’a’,’n’,’d’,’\0’,… ,’a’,’r’,’g’,’\0’, … }.
+
+Moreover, a data structure for keeping track of shell’s status. In
+contains information on possible errors that can occur and whether or
+not the process is started in background. Background information is
+updated during parsing as is error status. However errors can occur
+in other phases of the execution of the shell such as while calling
+execp. Foreground process is immediately joined after calling execp
+and background process is not joined but its pid is printed to indicate
+process starting.
+
+Two in build commands were added:
+    - exit: shutdown the shell
+    - clear: clears the screen from text
+
+The shell will also stop if a fatal error has occurred.
+
+Known issues:
+    - Character erasing does not work when using xterm terminal emulator.
+    - Following is not supported:
+        command “a string”
+      It will parse to command with arguments “a and string”.
+
+
+
+Assignment 5: Argument passing [optional]
+--------------------------------------------
+
+See EXECP system call explanation from Assignment 2 section. Basically
+arguments are read to kernel temporary stack space and copied into
+created process’s userland memory stack. SP register is decremented
+during the copy process.
+
+We implemented our argument passing so that EVERY created process gains
+at least one argument (argc >= 1): the first argument is always the
+process’s executable name.

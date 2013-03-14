@@ -17,6 +17,7 @@ tty0.socket
 halt
 shell
 test_join
+test_proc
 test_panic
 test_adventure
 test_fs_syscall

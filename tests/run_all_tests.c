@@ -15,9 +15,12 @@ int main() {
     int testsuite;
     test_num = 0;
 
-    testsuite = create_test_suite("test_join");
+    testsuite = create_test_suite("test_proc");
     add_test_case(testsuite, "basic");
     add_test_case(testsuite, "nochild");
+    add_test_case(testsuite, "maxprocs");
+    add_test_case(testsuite, "nofile");
+    add_test_case(testsuite, "invldexe");
 
     testsuite = create_test_suite("test_panic");
     add_test_case(testsuite, "stack");
@@ -48,6 +51,7 @@ int main() {
 
     run_suites();
     // all tests executed
+    cout("Wooot? All tests ok? Check results.\n");
     syscall_halt();
     return 0;
 }
@@ -83,7 +87,7 @@ static void run_suites() {
                retval = syscall_join(test_pid);
                cout("Test (PID: %d) over, return value: %d\n", test_pid, retval);
            } else {
-               cout("Test starting failed: %d", test_pid);
+               cout("Test starting failed: %d\n", test_pid);
            }
        }
    }

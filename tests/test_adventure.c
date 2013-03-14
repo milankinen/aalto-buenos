@@ -37,7 +37,7 @@ static const char* strs[NUM_STRS] = {
  NULL,  // this will be added in main (large string)
  NULL,  // this will be added in main (no terminator)
  "foobar",
- "[disk1]test_join",
+ "[disk1]test_proc",
  (const char*)(0x80000000 | 0xdeadbeef),
 };
 

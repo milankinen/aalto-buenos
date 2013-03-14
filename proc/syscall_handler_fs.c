@@ -71,6 +71,8 @@ openfile_t syscall_handle_open(const char *filename) {
 int syscall_handle_close(openfile_t filehandle) {
     int i;
     int filehandle_found = -1;
+    if (filehandle <= 0)
+        return 0;
     process_table_t *pt = get_current_process_entry();
     /*try to find the filehandle and close it */
     for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {

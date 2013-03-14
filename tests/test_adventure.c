@@ -6,11 +6,7 @@
 
 
 
-<<<<<<< HEAD
 #define NUM_SYSCALL 14
-=======
-#define NUM_SYSCALL 6
->>>>>>> created linking from thread entry to process table (required by assginment)
 
 #define NUM_STRS 6
 #define NUM_INTS 4
@@ -20,7 +16,6 @@
 
 static int syscalls[NUM_SYSCALL] = {
  //SYSCALL_HALT,
-<<<<<<< HEAD
  SYSCALL_EXEC,
  SYSCALL_EXIT,
  SYSCALL_JOIN,
@@ -30,17 +25,6 @@ static int syscalls[NUM_SYSCALL] = {
  SYSCALL_OPEN,
  SYSCALL_CLOSE,
  SYSCALL_SEEK,
-=======
- //SYSCALL_EXEC,
- //SYSCALL_EXIT,
- //SYSCALL_JOIN,
- //SYSCALL_FORK,
- //SYSCALL_MEMLIMIT,
- //SYSCALL_OPEN,
- //SYSCALL_CLOSE,
- //SYSCALL_SEEK,
- SYSCALL_READ,
->>>>>>> created linking from thread entry to process table (required by assginment)
  SYSCALL_WRITE,
  SYSCALL_CREATE,
  SYSCALL_DELETE,

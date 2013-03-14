@@ -6,7 +6,7 @@
 
 
 
-#define NUM_SYSCALL 9
+#define NUM_SYSCALL 14
 
 #define NUM_STRS 6
 #define NUM_INTS 4
@@ -16,15 +16,15 @@
 
 static int syscalls[NUM_SYSCALL] = {
  //SYSCALL_HALT,
- //SYSCALL_EXEC,
- //SYSCALL_EXIT,
- //SYSCALL_JOIN,
- //SYSCALL_FORK,
- //SYSCALL_MEMLIMIT,
+ SYSCALL_EXEC,
+ SYSCALL_EXIT,
+ SYSCALL_JOIN,
+ SYSCALL_FORK,
+ SYSCALL_MEMLIMIT,
+ SYSCALL_READ,
  SYSCALL_OPEN,
  SYSCALL_CLOSE,
  SYSCALL_SEEK,
- SYSCALL_READ,
  SYSCALL_WRITE,
  SYSCALL_CREATE,
  SYSCALL_DELETE,
@@ -91,6 +91,10 @@ int main(int argc, char** argv) {
         a1 = atoi(argv[2]);
         a2 = atoi(argv[3]);
         a3 = atoi(argv[4]);
+        if(syscallnum == SYSCALL_READ && a1 == stdin){
+            cout("Skipping stdin for SYSCALL_READ\n");
+            return 0;
+        }
         cout("Testing syscall %d with argument indexes a1=%d a2=%d a3=%d\n", syscallnum, a1, a2, a3);
         retval = _syscall(syscallnum, params[a1], params[a2], params[a3]);
         return (int)retval;

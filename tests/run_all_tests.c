@@ -38,6 +38,14 @@ int main() {
     add_test_case(testsuite, "noTermArgv");
     add_test_case(testsuite, "krnlArgv");
 
+    testsuite = create_test_suite("test_fs_syscall");
+    add_test_case(testsuite, "test_open_close");
+    add_test_case(testsuite, "test_read");
+    add_test_case(testsuite, "test_write");
+    add_test_case(testsuite, "test_create");
+    add_test_case(testsuite, "test_delete");
+    add_test_case(testsuite, "test_complex");
+
     run_suites();
     // all tests executed
     syscall_halt();
@@ -48,7 +56,7 @@ int main() {
 
 static int create_test_suite(const char* executable) {
     int num = test_num;
-    stringcopy(tests[num][0], executable, 20);
+    stringcopy(tests[num][0], executable, 30);
     cases[num] = 0;
     test_num++;
     return num;
@@ -56,17 +64,17 @@ static int create_test_suite(const char* executable) {
 
 static void add_test_case(int suite, const char* arg) {
     cases[suite]++;
-    stringcopy(tests[suite][cases[suite]], arg, 20);
+    stringcopy(tests[suite][cases[suite]], arg, 30);
 }
 
 static void run_suites() {
     int i, j, retval;
-    char filename[20];
+    char filename[30];
     int test_pid;
     char* argv[1];
 
     for (i = 0 ; i < test_num ; i++) {
-       snprintf(filename, 20, "[disk1]%s", tests[i][0]);
+       snprintf(filename, 30, "[disk1]%s", tests[i][0]);
        for (j = 0 ; j < cases[i] ; j++) {
            argv[0] = tests[i][j+1];
            cout("Running test %s [%s]\n", filename, argv[0]);

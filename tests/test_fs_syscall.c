@@ -17,7 +17,7 @@ void assert(int expected, int value, char *message) {
     }
 }
 
-void test_open_close() {
+static void test_open_close() {
 
     /*open nonexisting file*/
     int filehandle = syscall_open("[disk1]no_such_file.txt");
@@ -34,10 +34,9 @@ void test_open_close() {
     /*close existing file*/
     int return_value2 = syscall_close(filehandle2);
     assert(return_value2, 0, "test_open_close_4_failed\n");
-
 }
 
-void test_read() {
+static void test_read() {
     int bufsize = 50;
     char buffer[bufsize];
 
@@ -70,7 +69,7 @@ void test_read() {
     syscall_close(filehandle);
 }
 
-void test_write() {
+static void test_write() {
     int bufsize = 50;
     char buffer[bufsize];
     char *TEXT = "WRITTEN TEXT";
@@ -93,10 +92,9 @@ void test_write() {
     return_value = syscall_write(filehandle, LONG_TEXT, strlen(LONG_TEXT));
     assert(17, return_value, "test_write_3_failed\n");
     syscall_close(filehandle);
-
 }
 
-void test_create() {
+static void test_create() {
 
     char *FILEPATH1 = "[disk1]file1";
     char *TEXT = "It was the worst of times\n it was the best of times.";
@@ -134,10 +132,9 @@ void test_create() {
         return_value = syscall_create(FILEPATH2, 512);
         assert(0, return_value, "test_create_6_failed\n");
     }
-
 }
 
-void test_delete() {
+static void test_delete() {
 
     char *FILEPATH = "[disk1]andromeia";
     /*delete a file already residing in the fs*/
@@ -152,10 +149,9 @@ void test_delete() {
     syscall_create(FILEPATH, 512);
     return_value = syscall_delete(FILEPATH);
     assert(0, return_value, "test_delete3_failed\n");
-
 }
 
-void test_complex() {
+static void test_complex() {
 
     char *param[1];
     char filename[] = "[disk1]tempfile";
@@ -205,6 +201,35 @@ void test_read_stdin() {
     syscall_write(1, buf, 50);
 }
 
+int main(int argc, char** argv) {
+    if (argc <= 1) {
+        return 9;
+    }
+    if (stringcmp(argv[1], "test_open_close") == 0) {
+        test_open_close();
+    }
+    else if (stringcmp(argv[1], "test_read") == 0) {
+        test_read();
+    }
+    else if (stringcmp(argv[1], "test_write") == 0) {
+        test_write();
+    }
+    else if (stringcmp(argv[1], "test_create") == 0) {
+        test_create();
+    }
+    else if (stringcmp(argv[1], "test_delete") == 0) {
+        test_delete();
+    }
+    else if (stringcmp(argv[1], "test_complex") == 0) {
+        test_complex();
+    }
+
+    cout("test_complex finished\n");
+
+    return 0;
+}
+
+/*
 int main(void) {
 
     cout("starting test_fs_syscall");
@@ -224,3 +249,4 @@ int main(void) {
     syscall_halt();
     return 0;
 }
+*/

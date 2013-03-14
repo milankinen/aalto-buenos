@@ -317,7 +317,7 @@ shell_execute(shell_cmd *cmd, shell_status *status) {
         }
 
         retval = syscall_join(pid);
-        cout("Done, got: %d\n", retval);
+        cout("\nDone, got: %d\n", retval);
     } else {
         /* execute shell program with arguments */
         pid = syscall_execp(SHELL_NAME, cmd->argc, (const char**)cmd->argv);

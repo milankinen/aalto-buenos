@@ -6,6 +6,7 @@
 #include "tests/str.h"
 
 #define DISK "[disk1]"
+#define BUFFER_SIZE 128
 
 
 int main(int argc,char **argv) {
@@ -14,7 +15,6 @@ int main(int argc,char **argv) {
         cout("Invalid arguments. Usage: cat [filename]\n");
         return -1;
     }
-    int BUFFER_SIZE = 128;
 
     char* buffer[BUFFER_SIZE];
     char *filename = argv[1];

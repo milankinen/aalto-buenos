@@ -68,6 +68,7 @@ PID_t syscall_handle_execp(const char *filename, int argc, char** argv) {
 
 
 
+extern void syscall_close_all_filehandles(process_table_t*);
 
 void syscall_handle_exit(int retval) {
 
@@ -89,6 +90,7 @@ void syscall_handle_exit(int retval) {
 
     my_entry = get_current_process_entry();
     if (my_entry != NULL) {
+        syscall_close_all_filehandles(my_entry);
         my_thread = thread_get_current_thread_entry();
         intr_stat = _interrupt_disable();
         lock_acquire(my_entry->die_lock);

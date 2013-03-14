@@ -129,7 +129,7 @@ void test_create() {
     /*create a lots of files*/
     int i;
     char FILEPATH2[] = "[disk1]hauki";
-    for (i = 0; i < 13; i++) {
+    for (i = 0; i < 10; i++) {
         FILEPATH2[8]++;
         return_value = syscall_create(FILEPATH2, 512);
         assert(0, return_value, "test_create_6_failed\n");

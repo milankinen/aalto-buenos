@@ -13,6 +13,19 @@
 #include "drivers/gcd.h"
 #include "kernel/config.h"
 
+/*close all filehandles attached to the process*/
+void syscall_close_all_filehandles(process_table_t *pt) {
+    int i;
+    /*try to find the filehandle and close it */
+    for (i = 0; i < MAX_OPEN_FILES_PER_PROCESS; i++) {
+        int filehandle = pt->filehandle[i];
+        if (filehandle > 0) {
+            vfs_close(filehandle);
+        }
+        pt->filehandle[i] = -1;
+    }
+}
+
 /*check that the process has the given filehandle */
 static int check_filehandle(openfile_t filehandle, process_table_t* pt) {
     int i;
@@ -84,7 +97,6 @@ int syscall_handle_seek(openfile_t filehandle, int offset) {
     return vfs_seek(filehandle, offset);
 
 }
-
 
 int syscall_handle_read(openfile_t filehandle, void *buffer, int length) {
     char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
@@ -196,8 +208,8 @@ int syscall_handle_delete(const char *filename) {
     thread_table_t *t = thread_get_current_thread_entry();
     pagetable_t *p = t->pagetable;
     char temp[CONFIG_SYSCALL_MAX_BUFFER_SIZE];
-    if (read_data_from_vm(p, filename, temp,
-            strlen(filename) + 1)==RETVAL_SYSCALL_HELPERS_NOK) {
+    if (read_string_from_vm(p, filename, temp,
+            VFS_PATH_LENGTH)==RETVAL_SYSCALL_HELPERS_NOK) {
         kprintf("Process was killed\n");
         syscall_handle_exit(0);
         return -1;

@@ -95,34 +95,24 @@ void process_table_init() {
 PID_t get_current_process_pid() {
     // we can loop table without lock because we are in read-only state and
     // entry's "tid" doesn't change during read
+    thread_table_t* t;
     PID_t found = PROCESS_NO_PARENT_PID;
-    TID_t tid;
-    uint32_t i;
     interrupt_status_t stat = _interrupt_disable();
-    tid = thread_get_current_thread();
-    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
-        if (process_table[i].tid == tid && tid != PROCESS_NO_OWNER_TID) {
-            found = (PID_t)i;
-            break;
-        }
+    t = thread_get_current_thread_entry();
+    if (t != NULL) {
+        found = t->userland_pid;
     }
     _interrupt_set_state(stat);
     return found;
 }
 
 process_table_t* get_current_process_entry() {
-    // we can loop table without lock because we are in read-only state and
-    // entry's "tid" doesn't change during read
     process_table_t* found = NULL;
-    TID_t tid;
-    uint32_t i;
+    PID_t pid;
     interrupt_status_t stat = _interrupt_disable();
-    tid = thread_get_current_thread();
-    for (i = 0 ; i < CONFIG_MAX_PROCESSES ; i++) {
-        if (process_table[i].tid == tid && tid != PROCESS_NO_OWNER_TID) {
-            found = process_table + i;
-            break;
-        }
+    pid = get_current_process_pid();
+    if (pid >= 0 && pid < CONFIG_MAX_PROCESSES) {
+        found = process_table + pid;
     }
     _interrupt_set_state(stat);
     return found;
@@ -141,6 +131,9 @@ static void restore_process_state(child_process_create_data_t* data, process_tab
         intr_stat = _interrupt_disable();
         // process table entry has been created, we must free it
         free_process_table_entry(entry);
+        if (thread_entry != NULL) {
+            thread_entry->userland_pid = -1;
+        }
         _interrupt_set_state(intr_stat);
     }
     if (thread_entry && thread_entry->pagetable != NULL && release_page_table) {
@@ -228,6 +221,9 @@ void process_start(const char *executable, child_process_create_data_t* data)
         parent_proc_entry = NULL;
     }
 
+
+    my_entry = thread_get_current_thread_entry();
+
     intr_status = _interrupt_disable();
     lock_acquire(process_table_lock);
 
@@ -243,6 +239,7 @@ void process_start(const char *executable, child_process_create_data_t* data)
             my_proc_entry->retval           = PROCESS_NO_RETVAL;
             stringcopy(my_proc_entry->name, "foobar", PROCESS_NAME_MAX_LENGTH);
             my_pid = (PID_t)i;
+            my_entry->userland_pid = my_pid;
             if (parent_proc_entry != NULL) {
                 // correct child process linked list
                 if (parent_proc_entry->last_child_pid != PROCESS_NO_PARENT_PID) {
@@ -263,7 +260,6 @@ void process_start(const char *executable, child_process_create_data_t* data)
         return;
     }
 
-    my_entry = thread_get_current_thread_entry();
 
 
     /* If the pagetable of this thread is not NULL, we are trying to

@@ -113,6 +113,9 @@ void thread_table_init(void)
         thread_table[i].priority = THREAD_PRIORITY_NORMAL;
         #endif
     #endif
+    #ifdef CHANGED_2
+    thread_table[i].userland_pid = -1;
+    #endif
     }
 
     thread_table[IDLE_THREAD_TID].context->cpu_regs[MIPS_REGISTER_SP] =

@@ -86,22 +86,32 @@ typedef struct {
 
     #ifdef CHANGED_1
 
-    /* linked list "pointer" to next sleeping thread */
-    TID_t next_sleeper_id;
-    /* time when this thread should be woken up. if 0 then this thread is not asleep */
-    uint32_t wakeup_time;
+        /* linked list "pointer" to next sleeping thread */
+        TID_t next_sleeper_id;
+        /* time when this thread should be woken up. if 0 then this thread is not asleep */
+        uint32_t wakeup_time;
 
-    #ifdef CHANGED_ADDITIONAL_1
-    priority_t priority;
 
-    /* pad to 64 bytes */
-    uint32_t dummy_alignment_fill[6];
+        #ifdef CHANGED_ADDITIONAL_1
+            priority_t priority;
 
-    #else /* use fill as in CHANGED_1 */
+            #ifdef CHANGED_2
+                PID_t userland_pid;
+                uint32_t dummy_alignment_fill[5];
+            #else
+                /* pad to 64 bytes */
+                uint32_t dummy_alignment_fill[6];
+            #endif
 
-    /* pad to 64 bytes */
-    uint32_t dummy_alignment_fill[7];
-    #endif /* CHANGED_ADDITIONAL_1 */
+        #else /* use fill as in CHANGED_1 */
+            #ifdef CHANGED_2
+                PID_t userland_pid;
+                uint32_t dummy_alignment_fill[6];
+            #else
+                /* pad to 64 bytes */
+                uint32_t dummy_alignment_fill[7];
+            #endif
+        #endif /* CHANGED_ADDITIONAL_1 */
 
     #else
     /* pad to 64 bytes */

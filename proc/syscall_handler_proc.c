@@ -119,6 +119,7 @@ void syscall_handle_exit(int retval) {
         }
         vm_destroy_pagetable(my_thread->pagetable);
         my_thread->pagetable = NULL;
+        my_thread->userland_pid = -1;
 
         // all done, we can release locks
         lock_release(process_table_lock);

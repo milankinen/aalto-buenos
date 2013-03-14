@@ -17,7 +17,7 @@
 /**
  * Maximum lenght for process name.
  */
-#define PROCESS_NAME_MAX_LENGTH 32
+#define PROCESS_NAME_MAX_LENGTH 8
 /**
  * Maximum number of open files a process can attain
  */

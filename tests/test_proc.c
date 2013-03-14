@@ -42,7 +42,7 @@ static int run_no_file() {
     int pid;
     cout("** Trying to start process with non-existing filename\n");
     pid = syscall_exec("[dsi]no_exists");
-    cout("** Got %d\n");
+    cout("** Got %d\n", pid);
     return 0;
 }
 

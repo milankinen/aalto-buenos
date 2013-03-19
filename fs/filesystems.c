@@ -36,12 +36,19 @@
 
 #include "fs/filesystems.h"
 #include "fs/tfs.h"
+#ifdef CHANGED_3
+#   include "fs/sfs.h"
+#endif
 #include "drivers/device.h"
 
 /* NULL terminated table of all available filesystems. */
 
 static filesystems_t filesystems[] = {
+#ifdef CHANGED_3
+    {"SFS", &sfs_init},
+#else
     {"TFS", &tfs_init},
+#endif
     { NULL, NULL} /* Last entry must be a NULL pair. */ 
 };
 

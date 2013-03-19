@@ -21,6 +21,7 @@ int main() {
     add_test_case(testsuite, "maxprocs");
     add_test_case(testsuite, "nofile");
     add_test_case(testsuite, "invldexe");
+    add_test_case(testsuite, "maxargs");
 
     testsuite = create_test_suite("test_panic");
     add_test_case(testsuite, "stack");

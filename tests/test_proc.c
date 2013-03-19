@@ -54,6 +54,20 @@ static int invalid_executable() {
     return 0;
 }
 
+#define ARGS_TEST 31
+
+static int run_maximum_arguments() {
+    char* argv[ARGS_TEST];
+    int i;
+    for (i = 0 ; i < ARGS_TEST ; i++) {
+        argv[i] = "a";
+    }
+    cout("** Trying to start with %d arguments\n", ARGS_TEST);
+    i = syscall_execp("[disk1]test_proc", ARGS_TEST, (const char**)argv);
+    cout("** Got %d\n", i);
+    return 0;
+}
+
 
 int main(int argc, char** argv) {
     if (argc <= 1) {
@@ -69,6 +83,8 @@ int main(int argc, char** argv) {
         return run_no_file();
     } else if (stringcmp(argv[1], "invldexe") == 0) {
         return invalid_executable();
+    } else if (stringcmp(argv[1], "maxargs") == 0) {
+        return run_maximum_arguments();
     }
     return 0;
 }

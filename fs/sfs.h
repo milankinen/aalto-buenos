@@ -15,12 +15,13 @@
 #include "fs/vfs.h"
 #include "lib/libc.h"
 #include "lib/bitmap.h"
+#include "kernel/lock_cond.h"
 
 /* In SFS block size is 128. This will affect to various other
    features of SFS e.g. maximum file size. */
-#define SFS_BLOCK_SIZE 128
+#define SFS_BLOCK_SIZE 512
 
-#define SFS_BLOCKS_PER_VBLOCK 4
+#define SFS_BLOCKS_PER_VBLOCK 1
 
 #define SFS_VBLOCK_SIZE (SFS_BLOCK_SIZE*SFS_BLOCKS_PER_VBLOCK)
 
@@ -35,6 +36,8 @@
 /* Names are limited to 16 characters */
 #define SFS_VOLUMENAME_MAX 16
 #define SFS_FILENAME_MAX 16
+
+#define SFS_MAX_OPEN_FILES 32
 
 /*
    Maximum number of block pointers in one inode. Block pointers
@@ -74,6 +77,8 @@ typedef struct {
     /* File name */
     char     name[SFS_FILENAME_MAX];
 } sfs_direntry_t;
+
+
 
 #define SFS_MAX_FILES (SFS_VBLOCK_SIZE/sizeof(sfs_direntry_t))
 

@@ -17,6 +17,22 @@
 #include "lib/bitmap.h"
 
 
+
+typedef struct {
+    lock_t*     io_lock;
+    cond_t*     io_cond;
+    int         times_opened;
+    int         readernum;
+    TID_t       writer_tid;
+    int         fileid;
+    int         parentid;
+    int         is_folder;
+    int         is_deleted;
+} sfs_openfile_t;
+
+
+
+
 /* Data structure used internally by SFS filesystem. This data structure
    is used by sfs-functions. it is initialized during sfs_init(). Also
    memory for the buffers is reserved _dynamically_ during init.
@@ -41,7 +57,13 @@ typedef struct {
     sfs_inode_t    *buffer_inode;   /* buffer for inode blocks */
     bitmap_t       *buffer_bat;     /* buffer for allocation block */
     sfs_direntry_t *buffer_md;      /* buffer for directory block */
+
+    /* opened files and their runtime information in SFS filesystem */
+    sfs_openfile_t* open_files;
+    /* lock for open_files sync */
+    lock_t* openfile_lock;
 } sfs_t;
+
 
 
 
@@ -90,6 +112,209 @@ static int write_vblock(gbd_t *disk, uint32_t block, uint32_t pbuf) {
     return req.return_value == 0;
 }
 
+static void sfs_reset_entry(sfs_openfile_t* entry) {
+    // -1 indicates free
+    entry->fileid   = -1;
+    entry->parentid = -1;
+    // reset sync counters
+    entry->times_opened = 0;
+    entry->readernum    = 0;
+    entry->writer_tid   = -1;
+    // reset flags
+    entry->is_folder    = 0;
+    entry->is_deleted   = 0;
+}
+
+
+static void _delete(sfs_t* sfs, uint32_t fileid, uint32_t parentid) {
+    // TODO implement
+    sfs = sfs;
+    fileid = fileid;
+    parentid = parentid;
+}
+
+
+static sfs_openfile_t* sfs_enter_ext(sfs_t* sfs, int fileid, int parentid, int is_open_op, int is_folder) {
+    int i;
+    sfs_openfile_t* f;
+    if (fileid < 0) {
+        return NULL;
+    }
+    lock_acquire(sfs->openfile_lock);
+    f = NULL;
+    for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
+        if (sfs->open_files[i].fileid == fileid) {
+            f = sfs->open_files + i;
+            break;
+        } else if (sfs->open_files[i].fileid == -1 && f != NULL) {
+            f = sfs->open_files + i;
+        }
+    }
+    if (f == NULL) {
+        // no free slot was found and file is not used atm, operation fails
+        lock_release(sfs->openfile_lock);
+        return NULL;
+    }
+
+    if (f->fileid == -1) {
+        if (!is_open_op) {
+            lock_release(sfs->openfile_lock);
+            return NULL;
+        }
+        // we are opening new entry
+        f->fileid = fileid;
+        f->parentid = parentid;
+        f->is_folder = is_folder;
+    }
+
+    if (is_open_op) {
+        // file is being opened
+        f->times_opened++;
+    }
+    lock_release(sfs->openfile_lock);
+    return f;
+}
+
+static sfs_openfile_t* sfs_enter(sfs_t* sfs, int fileid) {
+    return sfs_enter_ext(sfs, fileid, -1, 0, 0);
+}
+
+static void sfs_exit(sfs_t* sfs, sfs_openfile_t* entry, int is_close_op) {
+    lock_acquire(sfs->openfile_lock);
+    if (is_close_op) {
+        entry->times_opened--;
+    }
+    if (entry->times_opened == 0) {
+        if (entry->is_deleted) {
+            _delete(sfs, entry->fileid, entry->parentid);
+        }
+        sfs_reset_entry(entry);
+    }
+    lock_release(sfs->openfile_lock);
+}
+
+
+static int sfs_is_valid_filename_char(char ch) {
+    return  (ch == '_') ||
+            (ch == '-') ||
+            (ch == ' ') ||
+            (ch >= 48 && ch <= 57) ||   // 0-9
+            (ch >= 65 && ch <= 90) ||   // A-Z
+            (ch >= 97 && ch <= 122);     // a-z
+}
+
+static int sfs_is_valid_path(const char* path) {
+    int len, i, elemchars;
+    if (path == NULL) {
+        return 0;
+    }
+    len = strlen(path);
+    if (len < 1 || path[0] != '/') {
+        // path must always start with '/'
+        return 0;
+    }
+    elemchars = 0;
+    for (i = 1 ; i < len ; i++) {
+        elemchars++;
+        if (elemchars >= SFS_FILENAME_MAX) {
+            // single path elem (e.g. /foo/barbarbarbarbarbar --> barbarbarbarbarbar) is too long
+            return 0;
+        }
+        if (path[i] == '/') {
+            if (path[i-1] == '/') {
+                // '//' in path is illegal
+                return 0;
+            }
+            // folders reset path elem character counter
+            elemchars = 0;
+            continue;
+        } else if (sfs_is_valid_filename_char(path[i])) {
+            continue;
+        } else {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int sfs_is_folder(const char* path) {
+    int len;
+    if (path == NULL) {
+        return 0;
+    }
+    len = strlen(path);
+    // test that path ends with '/' --> is folder
+    if (len >= 1 && path[len-1] == '/') {
+       return 1;
+    }
+    return 0;
+}
+
+/* This assumes that path is validated with sfs_is_valid_path befora calling this!! */
+static char* sfs_next_path_elem(char* consumed_path, char* buffer) {
+    int i = 0;
+    while(1) {
+        buffer[i] = consumed_path[i];
+        if (buffer[i] == '\0') {
+            if (i == 0) {
+                // no more path elements remaining
+                return NULL;
+            }
+            return consumed_path + i;
+        } else if (buffer[i] == '/') {
+            // end of folder element, start next time from next entry
+            return consumed_path + i + 1;
+        }
+        i++;
+    }
+    return NULL;
+}
+
+
+static int sfs_resolve_file(sfs_t* sfs, char* path, int* parent_inode) {
+    uint32_t i;
+    int r, block;
+    char* consumed_path;
+    // buffer for path elements
+    char filename[SFS_MAX_FILESIZE];
+
+    if (!sfs_is_valid_path(path)) {
+        return VFS_ERROR;
+    }
+    // path is OK, we can start to consume it, +1 because we want to ignore starting '/' (root)
+    consumed_path = path + 1;
+
+    // always starting from root directory
+    block = SFS_DIRECTORY_BLOCK;
+    *parent_inode = -1;
+    semaphore_P(sfs->lock);
+
+    while ((consumed_path = sfs_next_path_elem(consumed_path, filename))) {
+        r = read_vblock(sfs->disk, block, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+        if(r == 0) {
+            // an error occured during read
+            semaphore_V(sfs->lock);
+            return VFS_ERROR;
+        }
+
+        for(i=0; i < SFS_MAX_FILES; i++) {
+            if(stringcmp(sfs->buffer_md[i].name, filename) == 0) {
+                // found next inode
+                *parent_inode = block;
+                block = (int)sfs->buffer_md[i].inode;
+                continue;
+            }
+        }
+        // path element was not found, return error
+        semaphore_V(sfs->lock);
+        return VFS_ERROR;
+    }
+
+    // we have travelsed through directory tree and found our final file/folder
+    semaphore_V(sfs->lock);
+    return block;
+}
+
 
 /**
  * Initialize student filesystem. Allocates 1 page of memory dynamically for
@@ -108,8 +333,9 @@ fs_t * sfs_init(gbd_t *disk)
     char name[SFS_VOLUMENAME_MAX];
     fs_t *fs;
     sfs_t *sfs;
-    int r;
+    int r, i;
     semaphore_t *sem;
+    lock_t* lock;
 
     if(disk->block_size(disk) != SFS_BLOCK_SIZE) {
         return NULL;
@@ -122,9 +348,17 @@ fs_t * sfs_init(gbd_t *disk)
     return NULL;
     }
 
+    lock = lock_create();
+    if (lock == NULL) {
+        semaphore_destroy(sem);
+        kprintf("sfs init: could not create a new lock.\n");
+        return NULL;
+    }
+
     addr = pagepool_get_phys_page();
     if(addr == 0) {
         semaphore_destroy(sem);
+        lock_destroy(lock);
     kprintf("sfs_init: could not allocate memory.\n");
     return NULL;
     }
@@ -132,12 +366,13 @@ fs_t * sfs_init(gbd_t *disk)
 
 
     /* Assert that one page is enough */
-    KERNEL_ASSERT(PAGE_SIZE >= (3*SFS_VBLOCK_SIZE+sizeof(sfs_t)+sizeof(fs_t)));
+    KERNEL_ASSERT(PAGE_SIZE >= (3*SFS_VBLOCK_SIZE+sizeof(sfs_t)+sizeof(fs_t)) + (sizeof(openfile_t) * SFS_MAX_OPEN_FILES));
 
     /* Read header block, and make sure this is sfs drive */
     r = read_vblock(disk, 0, ADDR_KERNEL_TO_PHYS(addr));
     if (r == 0) {
         semaphore_destroy(sem);
+        lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
         kprintf("sfs_init: Error during disk read. Initialization failed.\n");
         return NULL;
@@ -146,6 +381,7 @@ fs_t * sfs_init(gbd_t *disk)
 
     if(((uint32_t *)addr)[0] != SFS_MAGIC) {
         semaphore_destroy(sem);
+        lock_destroy(lock);
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
     return NULL;
     }
@@ -164,13 +400,28 @@ fs_t * sfs_init(gbd_t *disk)
     sfs->buffer_md   = (sfs_direntry_t *)((uint32_t)sfs->buffer_bat +
                     SFS_VBLOCK_SIZE);
 
+    /** allocate openfile data block */
+    sfs->open_files = (sfs_openfile_t *)((uint32_t)sfs->buffer_md +
+            SFS_VBLOCK_SIZE);
+
     sfs->totalblocks  = MIN(disk->total_blocks(disk), 8*SFS_VBLOCK_SIZE);
     sfs->totalvblocks = MIN(disk->total_blocks(disk) / SFS_BLOCKS_PER_VBLOCK, 8*SFS_VBLOCK_SIZE);
     kprintf("blocks: p=%d, v=%d, d=%d\n", 8*SFS_VBLOCK_SIZE, 8*SFS_VBLOCK_SIZE, disk->total_blocks(disk));
     sfs->disk         = disk;
 
+
+    /* initialize openfile data block */
+    for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
+        // allocate locks
+        sfs->open_files[i].io_cond = condition_create();
+        sfs->open_files[i].io_lock = lock_create();
+        // reset other options
+        sfs_reset_entry(sfs->open_files + i);
+    }
+
     /* save the semaphore to the sfs_t */
     sfs->lock = sem;
+    sfs->openfile_lock = lock;
 
     fs->internal = (void *)sfs;
     stringcopy(fs->volume_name, name, VFS_NAME_LENGTH);
@@ -204,6 +455,8 @@ int sfs_unmount(fs_t *fs)
 
     sfs = (sfs_t *)fs->internal;
 
+    // TODO: delete files that are marked as deleted
+
     semaphore_P(sfs->lock); /* The semaphore should be free at this
       point, we get it just in case something has gone wrong. */
 
@@ -228,31 +481,28 @@ int sfs_unmount(fs_t *fs)
 int sfs_open(fs_t *fs, char *filename)
 {
     sfs_t *sfs;
-    uint32_t i;
-    int r;
+    sfs_openfile_t* entry;
+    int inode, parent_inode;
+    int is_deleted;
 
     sfs = (sfs_t *)fs->internal;
 
-    semaphore_P(sfs->lock);
-
-    r = read_vblock(sfs->disk, SFS_DIRECTORY_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
-    if(r == 0) {
-        /* An error occured during read. */
-        semaphore_V(sfs->lock);
+    // test that file exists
+    inode = sfs_resolve_file(sfs, filename, &parent_inode);
+    if (inode == VFS_ERROR) {
+        // not found
         return VFS_ERROR;
     }
-
-    for(i=0;i < SFS_MAX_FILES;i++) {
-        //kprintf("scanning file: %s (%d)\n", sfs->buffer_md[i].name, sfs->buffer_md[i].inode);
-        if(stringcmp(sfs->buffer_md[i].name, filename) == 0) {
-            semaphore_V(sfs->lock);
-            //kprintf("found sfs file %d \n", sfs->buffer_md[i].inode);
-            return sfs->buffer_md[i].inode;
-        }
+    entry = sfs_enter_ext(sfs, inode, parent_inode, 1, sfs_is_folder(filename));
+    if (entry == NULL) {
+        return VFS_ERROR;
     }
-
-    semaphore_V(sfs->lock);
-    return VFS_NOT_FOUND;
+    is_deleted = entry->is_deleted;
+    // exit sfs operation, if file is marked as deleted then we want to close
+    // file entry immediately and return error to indicate that file is no longer
+    // available
+    sfs_exit(sfs, entry, is_deleted);
+    return is_deleted ? VFS_ERROR : inode;
 }
 
 
@@ -626,6 +876,8 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     int b1, b2;
     int written=0;
     int r;
+    // TODO implement
+    sfs_enter(sfs, fileid);
 
     semaphore_P(sfs->lock);
 

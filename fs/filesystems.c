@@ -44,7 +44,7 @@
 /* NULL terminated table of all available filesystems. */
 
 static filesystems_t filesystems[] = {
-#ifdef CHANGED_3
+#ifdef CHANGED_3_ASD //TODO change to use SFS when implementation is ready for testing
     {"SFS", &sfs_init},
 #else
     {"TFS", &tfs_init},

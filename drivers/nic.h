@@ -51,7 +51,7 @@ typedef struct {
 
 typedef struct {
     spinlock_t slock;
-    semaphore_t sem;
+    semaphore_t *sem;
     /* FIXME: anything else? */
 } nic_real_device_t;
 

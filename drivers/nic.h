@@ -5,6 +5,7 @@
 #ifndef DRIVERS_NIC_H
 #define DRIVERS_NIC_H
 
+#include "kernel/lock_cond.h"
 #include "kernel/spinlock.h"
 #include "kernel/semaphore.h"
 #include "drivers/device.h"
@@ -49,10 +50,15 @@ typedef struct {
     volatile uint32_t dmaaddr;
 } nic_io_area_t;
 
+/* spinlock for synchronization in interrupt handler
+ * lock for synchronization in send/receive
+ * ccndition variables for waiting in send/receive
+ */
 typedef struct {
     spinlock_t slock;
-    semaphore_t *sem;
-    /* FIXME: anything else? */
+    lock_t *lock;
+    cond_t *crecv;
+    cond_t *csend;
 } nic_real_device_t;
 
 device_t *nic_init(io_descriptor_t *desc);

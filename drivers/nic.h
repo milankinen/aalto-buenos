@@ -54,14 +54,18 @@ typedef struct {
  * memory mapped io
  * lock for synchronization in send/receive
  * ccndition variables for waiting in send/receive
+ *
+ * if both lock and iolock are used acquire and release iolock
+ * inside lock and spinlock must always be the innermost.
  */
 typedef struct {
     spinlock_t slock;
     lock_t *lock;
-    cond_t *crecv;
-    cond_t *csend;
-    cond_t *cdma;
-    int     dmaaddr_used;
+    lock_t *dmalock;
+    cond_t *crxirq;
+    cond_t *crirq;
+    cond_t *csirq;
+    cond_t *csdma;
 } nic_real_device_t;
 
 device_t *nic_init(io_descriptor_t *desc);

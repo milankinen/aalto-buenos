@@ -159,7 +159,7 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
     if (NIC_STATUS_IADDR(io->status))
         retval = NIC_ERROR_IADDR;
     else if (NIC_STATUS_ERRORS(io->status)) {
-        kprintf("nic error: 0x%8.8x\n", DISK_STATUS_ERRORS(io->status));
+        kprintf("nic error: 0x%8.8x\n", NIC_STATUS_ERRORS(io->status));
         KERNEL_PANIC("nic error occured");
     }
     spinlock_release(&nic->slock);
@@ -191,7 +191,7 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     io->dmaaddr = (uint32_t)frame;
     io->command = NIC_COMMAND_RECEIVE;
     if (NIC_STATUS_ERRORS(io->status)) {
-        kprintf("nic error: 0x%8.8x\n", DISK_STATUS_ERRORS(io->status));
+        kprintf("nic error: 0x%8.8x\n", NIC_STATUS_ERRORS(io->status));
         KERNEL_PANIC("nic error occured");
     }
     spinlock_release(&nic->slock);

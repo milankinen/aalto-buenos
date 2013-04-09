@@ -10,5 +10,6 @@
 
 void network_test();
 void network_test2();
+void run_nic_tests();
 
 #endif /* TEST_NETWORK_H_ */

@@ -135,6 +135,9 @@ void init_startup_fallback(void) {
             run_thread_priority_tests();
         #endif /* CHANGED_ADDITIONAL_1 */
         #endif /* CHANGED_1 */
+        #ifdef CHANGED_3
+        run_nic_tests();
+        #endif
     }
 #ifdef CHANGED_3
     else if(bootargs_get("network1") != NULL){

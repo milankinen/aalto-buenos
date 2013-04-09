@@ -65,6 +65,7 @@
 #include "kernel_tests/make_water.h"
 #include "kernel_tests/change_1_tests.h"
 #include "kernel_tests/canal.h"
+#include "kernel_tests/test_network.h"
 
 /**
  * Fallback function for system startup. This function is executed
@@ -135,7 +136,16 @@ void init_startup_fallback(void) {
         #endif /* CHANGED_ADDITIONAL_1 */
         #endif /* CHANGED_1 */
     }
-
+#ifdef CHANGED_3
+    else if(bootargs_get("network1") != NULL){
+        kwrite("Starting network test1\n");
+        network_test();
+    }
+    else if(bootargs_get("network2") != NULL){
+        kwrite("Starting network test2\n");
+        network_test2();
+    }
+#endif
     /* Nothing else to do, so we shut the system down. */
     kprintf("Startup fallback code ends.\n");
     halt_kernel();

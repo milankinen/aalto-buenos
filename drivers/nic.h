@@ -50,7 +50,8 @@ typedef struct {
     volatile uint32_t dmaaddr;
 } nic_io_area_t;
 
-/* spinlock for synchronization in interrupt handler
+/* spinlock for synchronization in interrupt handler and for
+ * memory mapped io
  * lock for synchronization in send/receive
  * ccndition variables for waiting in send/receive
  */
@@ -59,6 +60,8 @@ typedef struct {
     lock_t *lock;
     cond_t *crecv;
     cond_t *csend;
+    cond_t *cdma;
+    int     dmaaddr_used;
 } nic_real_device_t;
 
 device_t *nic_init(io_descriptor_t *desc);

@@ -52,6 +52,8 @@ device_t *nic_init(io_descriptor_t *desc)
     real_dev->lock = lock_create();
     real_dev->crecv = condition_create();
     real_dev->csend = condition_create();
+    real_dev->cdma = condition_create();
+    real_dev->dmaaddr_used = 0;
 
     irq_mask = 1 << (desc->irq + 11);
     interrupt_register(irq_mask, nic_interrupt_handle, dev);
@@ -68,13 +70,16 @@ static void nic_interrupt_handle(device_t *device) {
     /* handle interrupts */
     if (NIC_STATUS_RXIRQ(io->status)) {
         /* frame ready to be tranfered from receive buffer */
+        /* transfer to memory */
         /* clear RXBUSY bit */
     }
     else if (NIC_STATUS_RIRQ(io->status)) {
         /* transfer from receive buffer to memory buffer ready */
+        /* wake up receivers */
     }
     else if (NIC_STATUS_SIRQ(io->status)) {
         /* transfer from memory buffer to send buffer ready */
+        /* wake up senders */
     }
     else {
         /* interrupt was not for us 
@@ -117,7 +122,9 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     /* acquire nic */
     lock_acquire(nic->lock);
     condition_wait(nic->crecv, nic->lock);
-    /* FIXME: when set dma and RXIRQ vs RIRQ */
+    lock_release(nic->lock);
+    /* FIXME: when set dma and RXIRQ vs RIRQ
+     * solution: only RIRQ wakes up? */
     io = io;
     gnd = gnd;
     frame = frame;
@@ -125,13 +132,21 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
 }
 
 static uint32_t nic_frame_size(struct gnd_struct *gnd) {
-    /* TODO */
-    gnd = gnd;
-    return 0;
+    nic_real_device_t *nic = gnd->device->real_device;
+    nic_io_area_t *io = (nic_io_area_t *)gnd->device->io_address;
+    /* io area is synchronized by the spinlock */
+    spinlock_acquire(&nic->slock);
+    uint32_t n = io->mtu;
+    spinlock_release(&nic->slock);
+    return n;
 }
 
 static network_address_t nic_hwaddr(struct gnd_struct *gnd) {
-    /* TODO */
-    gnd = gnd;
-    return 0;
+    nic_real_device_t *nic = gnd->device->real_device;
+    nic_io_area_t *io = (nic_io_area_t *)gnd->device->io_address;
+    /* io area is synchronized by the spinlock */
+    spinlock_acquire(&nic->slock);
+    network_address_t addr = io->hwaddr;
+    spinlock_release(&nic->slock);
+    return addr;
 }

@@ -19,7 +19,8 @@ util/tfstool write store.file tests/shell shell
 util/tfstool write store.file tests/cat cat
 util/tfstool write store.file tests/touch touch
 util/tfstool write store.file tests/append append
-# util/tfstool write store.file tests/bigfile.txt bigfile.txt
+util/tfstool write store.file tests/ls ls
+util/tfstool write store.file tests/bigfile.txt bigfile.txt
 
 
 # util/tfstool write store.file tests/run_all_tests run_all_tests

@@ -131,6 +131,7 @@ static void nic_interrupt_handle(device_t *device) {
 }
 
 static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr) {
+    int retval = 0;
     nic_real_device_t *nic = gnd->device->real_device;
     nic_io_area_t *io = (nic_io_area_t *)gnd->device->io_address;
 
@@ -149,13 +150,20 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
     io->dmaaddr = (uint32_t)frame;
     /* set COMMAND */
     io->command = NIC_COMMAND_SEND;
+    /* check errors */
+    if (NIC_STATUS_IADDR(io->status))
+        retval = NIC_ERROR_IADDR;
+    else if (NIC_STATUS_ERRORS(io->status)) {
+        kprintf("nic error: 0x%8.8x\n", NIC_STATUS_ERRORS(io->status));
+        KERNEL_PANIC("nic error occured");
+    }
     spinlock_release(&nic->slock);
 
     /* wait */
     condition_wait(nic->csirq, nic->lock);
     lock_release(nic->dmalock);
     lock_release(nic->lock);
-    return 0;
+    return retval;
 }
 
 static int nic_recv(struct gnd_struct *gnd, void *frame) {
@@ -182,6 +190,10 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     spinlock_acquire(&nic->slock);
     io->dmaaddr = (uint32_t)frame;
     io->command = NIC_COMMAND_RECEIVE;
+    if (NIC_STATUS_ERRORS(io->status)) {
+        kprintf("nic error: 0x%8.8x\n", NIC_STATUS_ERRORS(io->status));
+        KERNEL_PANIC("nic error occured");
+    }
     spinlock_release(&nic->slock);
 
     /* wait for the message to be tranfered to frame */

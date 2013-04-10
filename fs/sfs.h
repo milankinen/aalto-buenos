@@ -46,6 +46,8 @@
 */
 #define SFS_BLOCKS_MAX ((SFS_VBLOCK_SIZE/sizeof(uint32_t))-1)
 
+#define SFS_TEMP_BLOCKS_MAX 7
+
 /* Maximum file size. 512-byte Inode can store 127 blocks for a file.
    512*127=65024 */
 #define SFS_MAX_FILESIZE (SFS_VBLOCK_SIZE*SFS_BLOCKS_MAX)

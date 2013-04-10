@@ -42,6 +42,9 @@
 /* mask for the all above errors */
 #define NIC_STATUS_ERRORS(status)   ((status) & 0xf8000000)
 
+/* return value on error for send */
+#define NIC_ERROR_IADDR 1
+
 typedef struct {
     volatile uint32_t status;
     volatile uint32_t command;

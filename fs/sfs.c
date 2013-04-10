@@ -31,8 +31,6 @@ typedef struct {
 } sfs_openfile_t;
 
 
-
-
 /* Data structure used internally by SFS filesystem. This data structure
    is used by sfs-functions. it is initialized during sfs_init(). Also
    memory for the buffers is reserved _dynamically_ during init.
@@ -126,27 +124,107 @@ static void sfs_reset_entry(sfs_openfile_t* entry) {
 }
 
 
-static void _delete(sfs_t* sfs, uint32_t fileid, uint32_t parentid) {
-    // TODO implement
-    sfs = sfs;
-    fileid = fileid;
+static void _delete(sfs_t* sfs, int fileid, int parentid, int is_folder) {
+    int r, i;
+
+    // must lock sfs because we are using global buffers
+    semaphore_P(sfs->lock);
+
+    /* Read allocation block of the device and inode block of the file.
+       Free reserved blocks (marked in inode) from allocation block. */
+    r = read_vblock(sfs->disk, SFS_ALLOCATION_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
+    if (r == 0) {
+        /* An error occured. */
+        semaphore_V(sfs->lock);
+        return;
+    }
+    bitmap_set(sfs->buffer_bat, fileid, 0);
+
+    if (!is_folder) {
+        // FOR DIRECTORIES: free only inode which contains directory files (so this branch does nothing)
+        // FOR FILES: free also inodes containing the actual file contents
+        r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_inode));
+        if (r == 0) {
+            /* An error occured. */
+            semaphore_V(sfs->lock);
+            return;
+        }
+        i = 0;
+        while(i < (int)SFS_BLOCKS_MAX && sfs->buffer_inode->block[i] != 0) {
+            bitmap_set(sfs->buffer_bat, sfs->buffer_inode->block[i], 0);
+            i++;
+        }
+    } else {
+        // if deleted inode is a directory then we must notify all open file entries
+        // that their parent is destroyed so that they don't try to mark themselves as
+        // destroyed to non-existing inode
+        for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
+            if (sfs->open_files[i].parentid == fileid) {
+                sfs->open_files[i].parentid = -1;
+            }
+        }
+    }
+
+    /* write updated allocation block to disk */
+    r = write_vblock(sfs->disk, SFS_ALLOCATION_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
+    if (r == 0) {
+        /* An error occured. */
+        semaphore_V(sfs->lock);
+        return;
+    }
+
+    // all ok
     parentid = parentid;
+    semaphore_V(sfs->lock);
 }
 
 
-static sfs_openfile_t* sfs_enter_ext(sfs_t* sfs, int fileid, int parentid, int is_open_op, int is_folder) {
+static void _delete_from_dirtree(sfs_t* sfs, int fileid, int parentid) {
+    int r, i;
+    semaphore_P(sfs->lock);
+    /* Free entry from parent directory inode (if parent direcotry is not deleted before this operation) */
+    if (parentid > 0) {
+        r = read_vblock(sfs->disk, parentid, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+        if (r == 0) {
+            /* An error occured. */
+            semaphore_V(sfs->lock);
+            return;
+        }
+        // mark entries as unused so that new files can be created with same name
+        // to the directory (virtually, file is deleted at this point!)
+        for (i = 0 ; i < (int)SFS_MAX_FILES ; i++) {
+            if ((int)sfs->buffer_md[i].inode == fileid) {
+                sfs->buffer_md[i].inode     = 0;
+                sfs->buffer_md[i].name[0]   = '\0';
+            }
+        }
+        // update disk block for parent directory
+        r = write_vblock(sfs->disk, parentid, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+        if(r == 0) {
+            /* An error occured. */
+            semaphore_V(sfs->lock);
+            return;
+        }
+    }
+    // all OK
+    semaphore_V(sfs->lock);
+}
+
+
+static sfs_openfile_t* sfs_enter_ext(sfs_t* sfs, int fileid, int parentid, int is_open_op, int is_folder, int mark_as_deleted) {
     int i;
     sfs_openfile_t* f;
     if (fileid < 0) {
         return NULL;
     }
+    kprintf("enter: %d, opening %d, deleting %d\n", fileid, is_open_op, mark_as_deleted);
     lock_acquire(sfs->openfile_lock);
     f = NULL;
     for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
         if (sfs->open_files[i].fileid == fileid) {
             f = sfs->open_files + i;
             break;
-        } else if (sfs->open_files[i].fileid == -1 && f != NULL) {
+        } else if (sfs->open_files[i].fileid == -1 && f == NULL) {
             f = sfs->open_files + i;
         }
     }
@@ -171,22 +249,32 @@ static sfs_openfile_t* sfs_enter_ext(sfs_t* sfs, int fileid, int parentid, int i
         // file is being opened
         f->times_opened++;
     }
+    if (mark_as_deleted) {
+        if (!f->is_deleted) {
+            // if we call delete first time, we must remove the file from directory tree
+            // so that new files can be created with same name even though the contents
+            // of the deleted file remain in the disk until all handles are cleared
+            _delete_from_dirtree(sfs, f->fileid, f->parentid);
+        }
+        f->is_deleted = 1;
+    }
     lock_release(sfs->openfile_lock);
     return f;
 }
 
 static sfs_openfile_t* sfs_enter(sfs_t* sfs, int fileid) {
-    return sfs_enter_ext(sfs, fileid, -1, 0, 0);
+    return sfs_enter_ext(sfs, fileid, -1, 0, 0, 0);
 }
 
 static void sfs_exit(sfs_t* sfs, sfs_openfile_t* entry, int is_close_op) {
+    kprintf("exit: %d, closing %d\n", entry->fileid, is_close_op);
     lock_acquire(sfs->openfile_lock);
     if (is_close_op) {
         entry->times_opened--;
     }
     if (entry->times_opened == 0) {
         if (entry->is_deleted) {
-            _delete(sfs, entry->fileid, entry->parentid);
+            _delete(sfs, entry->fileid, entry->parentid, entry->is_folder);
         }
         sfs_reset_entry(entry);
     }
@@ -231,10 +319,26 @@ static int sfs_is_valid_path(const char* path) {
         } else if (sfs_is_valid_filename_char(path[i])) {
             continue;
         } else {
+            // found invalid path character
             return 0;
         }
     }
     return 1;
+}
+
+static const char* sfs_get_actual_filename(const char* path) {
+    int last = -1, i = 0;
+    while(1) {
+        if (path[i] == '/') {
+            if (path[i+1] != '\0') {
+                last = i;
+            }
+        } else if (path[i] == '\0') {
+            break;
+        }
+        i++;
+    }
+    return path + last + 1;
 }
 
 static int sfs_is_folder(const char* path) {
@@ -262,6 +366,7 @@ static char* sfs_next_path_elem(char* consumed_path, char* buffer) {
             }
             return consumed_path + i;
         } else if (buffer[i] == '/') {
+            buffer[i+1] = '\0';
             // end of folder element, start next time from next entry
             return consumed_path + i + 1;
         }
@@ -271,18 +376,19 @@ static char* sfs_next_path_elem(char* consumed_path, char* buffer) {
 }
 
 
-static int sfs_resolve_file(sfs_t* sfs, char* path, int* parent_inode) {
+static int sfs_resolve_file_ext(sfs_t* sfs, char* path, int* parent_inode, int* parent_exists) {
     uint32_t i;
-    int r, block;
+    int r, block, ok;
     char* consumed_path;
     // buffer for path elements
-    char filename[SFS_MAX_FILESIZE];
-
+    char filename[SFS_FILENAME_MAX];
+    kprintf("resolving %s\n", path);
     if (!sfs_is_valid_path(path)) {
         return VFS_ERROR;
     }
     // path is OK, we can start to consume it, +1 because we want to ignore starting '/' (root)
     consumed_path = path + 1;
+
 
     // always starting from root directory
     block = SFS_DIRECTORY_BLOCK;
@@ -291,19 +397,34 @@ static int sfs_resolve_file(sfs_t* sfs, char* path, int* parent_inode) {
 
     while ((consumed_path = sfs_next_path_elem(consumed_path, filename))) {
         r = read_vblock(sfs->disk, block, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+        *parent_inode = block;
+
         if(r == 0) {
             // an error occured during read
             semaphore_V(sfs->lock);
             return VFS_ERROR;
         }
 
+        ok = 0;
         for(i=0; i < SFS_MAX_FILES; i++) {
-            if(stringcmp(sfs->buffer_md[i].name, filename) == 0) {
+            kprintf("testing %s, %d (%s)\n", sfs->buffer_md[i].name, sfs->buffer_md[i].inode, filename);
+            if(sfs->buffer_md[i].inode > 0 && stringcmp(sfs->buffer_md[i].name, filename) == 0) {
                 // found next inode
-                *parent_inode = block;
                 block = (int)sfs->buffer_md[i].inode;
-                continue;
+                ok = 1;
+                kprintf("jmp\n");
+                break;
             }
+        }
+        if (ok) {
+            continue;
+        }
+
+        if (parent_exists != NULL) {
+            // if we are checking the last path elem (=searched file) which is not found
+            // then we can inform that its parent folder exists (even though the file doesn't
+            // exist in its parent folder)
+            *parent_exists = !sfs_next_path_elem(consumed_path, filename) ? 1 : 0;
         }
         // path element was not found, return error
         semaphore_V(sfs->lock);
@@ -315,6 +436,9 @@ static int sfs_resolve_file(sfs_t* sfs, char* path, int* parent_inode) {
     return block;
 }
 
+static int sfs_resolve_file(sfs_t* sfs, char* path, int* parent_inode) {
+    return sfs_resolve_file_ext(sfs, path, parent_inode, NULL);
+}
 
 /**
  * Initialize student filesystem. Allocates 1 page of memory dynamically for
@@ -344,23 +468,23 @@ fs_t * sfs_init(gbd_t *disk)
     /* check semaphore availability before memory allocation */
     sem = semaphore_create(1);
     if (sem == NULL) {
-    kprintf("sfs_init: could not create a new semaphore.\n");
-    return NULL;
+        //kprintf("sfs_init: could not create a new semaphore.\n");
+        return NULL;
     }
 
     lock = lock_create();
     if (lock == NULL) {
         semaphore_destroy(sem);
-        kprintf("sfs init: could not create a new lock.\n");
+        //kprintf("sfs init: could not create a new lock.\n");
         return NULL;
     }
 
     addr = pagepool_get_phys_page();
-    if(addr == 0) {
+    if (addr == 0) {
         semaphore_destroy(sem);
         lock_destroy(lock);
-    kprintf("sfs_init: could not allocate memory.\n");
-    return NULL;
+        //kprintf("sfs_init: could not allocate memory.\n");
+        return NULL;
     }
     addr = ADDR_PHYS_TO_KERNEL(addr);      /* transform to vm address */
 
@@ -374,7 +498,7 @@ fs_t * sfs_init(gbd_t *disk)
         semaphore_destroy(sem);
         lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-        kprintf("sfs_init: Error during disk read. Initialization failed.\n");
+        //kprintf("sfs_init: Error during disk read. Initialization failed.\n");
         return NULL;
     }
 
@@ -382,8 +506,8 @@ fs_t * sfs_init(gbd_t *disk)
     if(((uint32_t *)addr)[0] != SFS_MAGIC) {
         semaphore_destroy(sem);
         lock_destroy(lock);
-    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-    return NULL;
+        pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+        return NULL;
     }
 
     /* Copy volume name from header block. */
@@ -406,7 +530,7 @@ fs_t * sfs_init(gbd_t *disk)
 
     sfs->totalblocks  = MIN(disk->total_blocks(disk), 8*SFS_VBLOCK_SIZE);
     sfs->totalvblocks = MIN(disk->total_blocks(disk) / SFS_BLOCKS_PER_VBLOCK, 8*SFS_VBLOCK_SIZE);
-    kprintf("blocks: p=%d, v=%d, d=%d\n", 8*SFS_VBLOCK_SIZE, 8*SFS_VBLOCK_SIZE, disk->total_blocks(disk));
+    ////kprintf("blocks: p=%d, v=%d, d=%d\n", 8*SFS_VBLOCK_SIZE, 8*SFS_VBLOCK_SIZE, disk->total_blocks(disk));
     sfs->disk         = disk;
 
 
@@ -452,10 +576,19 @@ fs_t * sfs_init(gbd_t *disk)
 int sfs_unmount(fs_t *fs)
 {
     sfs_t *sfs;
+    int i;
 
     sfs = (sfs_t *)fs->internal;
 
-    // TODO: delete files that are marked as deleted
+    // delete files that are marked as deleted
+    for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
+        if (sfs->open_files[i].fileid > 0 && sfs->open_files[i].is_deleted) {
+            _delete(sfs, sfs->open_files[i].fileid, sfs->open_files[i].parentid, sfs->open_files[i].is_folder);
+        }
+    }
+
+    // destroy sfs openfile table lock
+    lock_destroy(sfs->openfile_lock);
 
     semaphore_P(sfs->lock); /* The semaphore should be free at this
       point, we get it just in case something has gone wrong. */
@@ -487,22 +620,26 @@ int sfs_open(fs_t *fs, char *filename)
 
     sfs = (sfs_t *)fs->internal;
 
+    //kprintf("open %s\n", filename);
     // test that file exists
     inode = sfs_resolve_file(sfs, filename, &parent_inode);
     if (inode == VFS_ERROR) {
         // not found
-        return VFS_ERROR;
+        return VFS_NOT_FOUND;
     }
-    entry = sfs_enter_ext(sfs, inode, parent_inode, 1, sfs_is_folder(filename));
+
+    entry = sfs_enter_ext(sfs, inode, parent_inode, 1, sfs_is_folder(filename), 0);
     if (entry == NULL) {
         return VFS_ERROR;
     }
     is_deleted = entry->is_deleted;
+
     // exit sfs operation, if file is marked as deleted then we want to close
     // file entry immediately and return error to indicate that file is no longer
     // available
     sfs_exit(sfs, entry, is_deleted);
-    return is_deleted ? VFS_ERROR : inode;
+    //kprintf("open-end %s\n", filename);
+    return is_deleted ? VFS_NOT_FOUND : inode;
 }
 
 
@@ -517,9 +654,18 @@ int sfs_open(fs_t *fs, char *filename)
  */
 int sfs_close(fs_t *fs, int fileid)
 {
-    fs = fs;
-    fileid = fileid;
+    //kprintf("close %d\n", fileid);
+    sfs_t *sfs;
+    sfs_openfile_t* entry;
 
+    ////kprintf("qwewerrte\n");
+    sfs = (sfs_t *)fs->internal;
+    entry = sfs_enter(sfs, fileid);
+    if (entry == NULL) {
+        return VFS_ERROR;
+    }
+    // close entry (delete is done in sfs_exit if needed)
+    sfs_exit(sfs, entry, 1);
     return VFS_OK;
 }
 
@@ -537,55 +683,67 @@ int sfs_close(fs_t *fs, int fileid)
  * @return If file allready exists or not enough space return VFS_ERROR,
  * otherwise return VFS_OK.
  */
-int sfs_create(fs_t *fs, char *filename, int size)
-{
-    sfs_t *sfs = (sfs_t *)fs->internal;
-    uint32_t i;
-    uint32_t numblocks = (size + SFS_BLOCK_SIZE - 1) / SFS_BLOCK_SIZE;
-    uint32_t numvblocks = numblocks / SFS_BLOCKS_PER_VBLOCK + ((numblocks % SFS_BLOCKS_PER_VBLOCK) ? 1 : 0);
-    int index = -1;
-    int r;
+int sfs_create(fs_t *fs, char *filename, int size) {
 
-    semaphore_P(sfs->lock);
-
-    /* check that we don't need more virtual blocks than our inode can contain */
-    if(numvblocks > (SFS_VBLOCK_SIZE / 4 - 1)) {
-    semaphore_V(sfs->lock);
-    return VFS_ERROR;
+    if (!sfs_is_valid_path(filename)) {
+        // invalid path
+        return VFS_ERROR;
     }
 
-    /* Read directory block. Check that file doesn't allready exist and
+    sfs_t *sfs = (sfs_t *)fs->internal;
+    uint32_t i;
+    int index = -1;
+    int r, file_inode, parent_inode, parent_exists, is_folder;
+
+    is_folder = sfs_is_folder(filename);
+    if (is_folder) {
+        // folders don't need addition inodes for data storing
+        size = 0;
+    }
+    uint32_t numblocks = (size + SFS_BLOCK_SIZE - 1) / SFS_BLOCK_SIZE;
+    uint32_t numvblocks = numblocks / SFS_BLOCKS_PER_VBLOCK + ((numblocks % SFS_BLOCKS_PER_VBLOCK) ? 1 : 0);
+
+
+    /* check that we don't need more virtual blocks than our inode can contain */
+    if (numvblocks > SFS_BLOCKS_MAX) {
+        return VFS_ERROR;
+    }
+
+    file_inode = sfs_resolve_file_ext(sfs, filename, &parent_inode, &parent_exists);
+    if (file_inode != VFS_ERROR || parent_inode < 0 || !parent_exists) {
+        // file creation is not possible. either parent folder doesn't exist or file
+        // already exists in the given path
+        return VFS_ERROR;
+    }
+
+    semaphore_P(sfs->lock);
+    /* Read parent directory block. Check that file doesn't allready exist and
        there is space left for the file in directory block. */
-    r = read_vblock(sfs->disk, SFS_DIRECTORY_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
-    if(r == 0) {
+    r = read_vblock(sfs->disk, parent_inode, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+    if (r == 0) {
         /* An error occured. */
         semaphore_V(sfs->lock);
         return VFS_ERROR;
     }
 
-    for(i=0;i<SFS_MAX_FILES;i++) {
-    if(stringcmp(sfs->buffer_md[i].name, filename) == 0) {
+    for (i=0 ; i < SFS_MAX_FILES ; i++) {
+        if(sfs->buffer_md[i].inode == 0) {
+            /* found free slot from directory */
+            index = i;
+        }
+    }
+
+    if(index == -1) {
+        /* there was no space in directory, because index is not set */
         semaphore_V(sfs->lock);
         return VFS_ERROR;
     }
 
-    if(sfs->buffer_md[i].inode == 0) {
-        /* found free slot from directory */
-        index = i;
-    }
-    }
-
-    if(index == -1) {
-    /* there was no space in directory, because index is not set */
-    semaphore_V(sfs->lock);
-    return VFS_ERROR;
-    }
-
-    stringcopy(sfs->buffer_md[index].name,filename, SFS_FILENAME_MAX);
+    stringcopy(sfs->buffer_md[index].name, sfs_get_actual_filename(filename), SFS_FILENAME_MAX);
 
     /* Read allocation block and... */
     r = read_vblock(sfs->disk, SFS_ALLOCATION_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-    if(r==0) {
+    if (r == 0) {
         /* An error occured. */
         semaphore_V(sfs->lock);
         return VFS_ERROR;
@@ -593,64 +751,79 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
 
     /* ...find space for inode... */
-    sfs->buffer_md[index].inode = bitmap_findnset(sfs->buffer_bat,
-                          sfs->totalvblocks);
-    if((int)sfs->buffer_md[index].inode == -1) {
-    semaphore_V(sfs->lock);
-    return VFS_ERROR;
+    sfs->buffer_md[index].inode = bitmap_findnset(sfs->buffer_bat, sfs->totalvblocks);
+    if ((int)sfs->buffer_md[index].inode == -1) {
+        semaphore_V(sfs->lock);
+        return VFS_ERROR;
     }
 
-    /* ...and the rest of the blocks. Mark found block numbers in
-       inode.*/
-    sfs->buffer_inode->filesize = size;
-    for(i=0; i<numvblocks; i++) {
-        sfs->buffer_inode->block[i] = bitmap_findnset(sfs->buffer_bat,
-                                  sfs->totalvblocks);
-        if((int)sfs->buffer_inode->block[i] == -1) {
-            /* Disk full. No free block found. */
-            semaphore_V(sfs->lock);
-            return VFS_ERROR;
+    if (!is_folder) {
+        /* ...and the rest of the blocks (only files!). Mark found block numbers in inode.*/
+        sfs->buffer_inode->filesize = size;
+        for (i = 0; i < numvblocks; i++) {
+            sfs->buffer_inode->block[i] = bitmap_findnset(sfs->buffer_bat, sfs->totalvblocks);
+            if ((int)sfs->buffer_inode->block[i] == -1) {
+                /* Disk full. No free block found. */
+                semaphore_V(sfs->lock);
+                return VFS_ERROR;
+            }
         }
+
+        /* Mark rest of the virtual blocks in inode as unused. */
+        while(i < SFS_BLOCKS_MAX) {
+            sfs->buffer_inode->block[i++] = 0;
+        }
+
     }
 
-    /* Mark rest of the virtual blocks in inode as unused. */
-    while(i < (SFS_VBLOCK_SIZE / 4 - 1)) {
-        sfs->buffer_inode->block[i++] = 0;
-    }
-
-
+    /* Update allocation block so that used blocks (also inode!) are marked as occupied */
     r = write_vblock(sfs->disk, SFS_ALLOCATION_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-    if(r==0) {
+    if (r == 0) {
         /* An error occured. */
         semaphore_V(sfs->lock);
         return VFS_ERROR;
     }
 
-    r = write_vblock(sfs->disk, SFS_DIRECTORY_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
-    if(r==0) {
+    /* update parent directory block in the disk */
+    r = write_vblock(sfs->disk, parent_inode, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+    if (r == 0) {
         /* An error occured. */
         semaphore_V(sfs->lock);
         return VFS_ERROR;
     }
 
-    r = write_vblock(sfs->disk, sfs->buffer_md[index].inode, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_inode));
-    if(r==0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
+    if (!is_folder) {
+        // FOR FILES: write file's inode data to the disk and then zero the blocks for file content
 
-    /* Write zeros to the reserved blocks. Buffer for allocation block
-       is no longer needed, so lets use it as zero buffer. */
-    memoryset(sfs->buffer_bat, 0, SFS_VBLOCK_SIZE);
-    for(i=0;i<numvblocks;i++) {
-        r = write_vblock(sfs->disk, sfs->buffer_inode->block[i], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-        if(r==0) {
+        r = write_vblock(sfs->disk, sfs->buffer_md[index].inode, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_inode));
+        if (r == 0) {
             /* An error occured. */
             semaphore_V(sfs->lock);
             return VFS_ERROR;
         }
 
+        /* Write zeros to the reserved blocks. Buffer for allocation block
+           is no longer needed, so lets use it as zero buffer. */
+        memoryset(sfs->buffer_bat, 0, SFS_VBLOCK_SIZE);
+        for(i=0;i<numvblocks;i++) {
+            r = write_vblock(sfs->disk, sfs->buffer_inode->block[i], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
+            if (r == 0) {
+                /* An error occured. */
+                semaphore_V(sfs->lock);
+                return VFS_ERROR;
+            }
+
+        }
+    } else {
+        // FOR DIRECTORIES: construct empty directory inode (no files in it) and write it to the disk
+        file_inode = sfs->buffer_md[index].inode;
+        memoryset(sfs->buffer_md, 0, sizeof(sfs_direntry_t) * SFS_MAX_FILES);
+        r = write_vblock(sfs->disk, file_inode, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
+        if (r == 0) {
+            /* An error occured. */
+            semaphore_V(sfs->lock);
+            return VFS_ERROR;
+        }
     }
 
     semaphore_V(sfs->lock);
@@ -670,78 +843,37 @@ int sfs_create(fs_t *fs, char *filename, int size)
 int sfs_remove(fs_t *fs, char *filename)
 {
     sfs_t *sfs = (sfs_t *)fs->internal;
-    uint32_t i;
-    int index = -1;
-    int r;
+    int file_inode, parent_inode;
+    sfs_openfile_t* entry;
 
-    semaphore_P(sfs->lock);
-
-    /* Find file and inode block number from directory block.
-       If not found return VFS_NOT_FOUND. */
-    r = read_vblock(sfs->disk, SFS_DIRECTORY_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
-
-    for(i=0;i<SFS_MAX_FILES;i++) {
-        if(stringcmp(sfs->buffer_md[i].name, filename) == 0) {
-            index = i;
-            break;
-        }
-    }
-    if(index == -1) {
-        semaphore_V(sfs->lock);
+    file_inode = sfs_resolve_file(sfs, filename, &parent_inode);
+    if (file_inode == VFS_ERROR || stringcmp(filename, "/") == 0) {
+        // file was not found or path was incorrect or trying to delete root directory
         return VFS_NOT_FOUND;
     }
 
-    /* Read allocation block of the device and inode block of the file.
-       Free reserved blocks (marked in inode) from allocation block. */
-    r = read_vblock(sfs->disk, SFS_ALLOCATION_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
+    // open file entry and mark it immediately as deleted
+    entry = sfs_enter_ext(sfs, file_inode, parent_inode, 1, sfs_is_folder(filename), 1);
+    if (entry == NULL) {
+        // entry opening failed
         return VFS_ERROR;
     }
-
-    r = read_vblock(sfs->disk, sfs->buffer_md[index].inode, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_inode));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
-
-
-    bitmap_set(sfs->buffer_bat,sfs->buffer_md[index].inode,0);
-    i = 0;
-    while(sfs->buffer_inode->block[i] != 0 && i < (SFS_VBLOCK_SIZE / 4 - 1)) {
-        bitmap_set(sfs->buffer_bat, sfs->buffer_inode->block[i], 0);
-        i++;
-    }
-
-    /* Free directory entry. */
-    sfs->buffer_md[index].inode   = 0;
-    sfs->buffer_md[index].name[0] = 0;
-
-    r = write_vblock(sfs->disk, SFS_ALLOCATION_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
-
-    r = write_vblock(sfs->disk, SFS_DIRECTORY_BLOCK, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
-
-    semaphore_V(sfs->lock);
+    // close it immediately, if entry is not opened elsewhere then the file is deleted
+    sfs_exit(sfs, entry, 1);
     return VFS_OK;
 }
 
+
+static void sfs_end_read(sfs_t* sfs, sfs_openfile_t* entry) {
+    lock_acquire(entry->io_lock);
+    entry->readernum--;
+    if (entry->readernum == 0) {
+        // signal to the waiting writers that it's allowd to continue
+        condition_broadcast(entry->io_cond, entry->io_lock);
+    }
+    lock_release(entry->io_lock);
+    sfs_exit(sfs, entry, 0);
+}
 
 /**
  * Reads at most bufsize bytes from file to the buffer starting from
@@ -764,96 +896,137 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     int b1, b2;
     int read=0;
     int r;
+    sfs_openfile_t* entry;
+    sfs_inode_t inode;
+    char bat_t[SFS_VBLOCK_SIZE];
+    char* bat = bat_t;
 
-    semaphore_P(sfs->lock);
-
-    /* fileid is blocknum so ensure that we don't read system blocks
-       or outside the disk */
-    if(fileid < 2 || fileid > (int)sfs->totalvblocks) {
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
-    //kprintf("read file id=%d, sz=%d, offset=%d, tot=%d\n", fileid, bufsize, offset, sfs->totalvblocks);
-
-    r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_inode));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
+    //kprintf("asdsad %d\n", fileid);
+    /* fileid is blocknum so ensure that we don't read system blocks or outside the disk */
+    if(fileid < SFS_DIRECTORY_BLOCK || fileid > (int)sfs->totalvblocks) {
         return VFS_ERROR;
     }
 
-    //kprintf("file size: %d\n", sfs->buffer_inode->filesize);
-
-    /* Check that offset is inside the file */
-    if(offset < 0 || offset > (int)sfs->buffer_inode->filesize) {
-        semaphore_V(sfs->lock);
+    entry = sfs_enter(sfs, fileid);
+    if (entry == NULL) {
         return VFS_ERROR;
     }
 
-    /* Read at most what is left from the file. */
-    bufsize = MIN(bufsize,((int)sfs->buffer_inode->filesize) - offset);
-
-    if(bufsize==0) {
-        semaphore_V(sfs->lock);
-        return 0;
+    // READ/WRITE sync
+    lock_acquire(entry->io_lock);
+    while(entry->writer_tid != -1) {
+        condition_wait(entry->io_cond, entry->io_lock);
     }
+    entry->readernum++;
+    lock_release(entry->io_lock);
 
-    /* first block to be read from the disk */
-    b1 = offset / SFS_VBLOCK_SIZE;
-
-    /* last block to be read from the disk */
-    b2 = (offset+bufsize-1) / SFS_VBLOCK_SIZE;
-
-    /* Read blocks from b1 to b2. First and last are
-       special cases because whole block might not be written
-       to the buffer. */
-    r = read_vblock(sfs->disk, sfs->buffer_inode->block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
-        return VFS_ERROR;
-    }
-
-    /* Count the number of the bytes to be read from the block and
-       written to the buffer from the first block. */
-    read = MIN(SFS_VBLOCK_SIZE - (offset % SFS_VBLOCK_SIZE), bufsize);
-    memcopy(read, buffer,
-        (const uint32_t *)(((uint32_t)sfs->buffer_bat) +
-                   (offset % SFS_VBLOCK_SIZE)));
-
-    buffer = (void *)((uint32_t)buffer + read);
-    b1++;
-    while(b1 <= b2) {
-        r = read_vblock(sfs->disk, sfs->buffer_inode->block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-        if(r == 0) {
+    // NOW IT'S OK TO READ!
+    if (entry->is_folder) {
+        // directory reading is a little bit different from normal files:
+        // only file/folder names are read from inode so that memory structure is
+        // <numfiles> <filename1> <filename2>...
+        if (offset != 0 || bufsize < SFS_VBLOCK_SIZE) {
+            sfs_end_read(sfs, entry);
+            return VFS_ERROR;
+        }
+        r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+        if (r == 0) {
+            sfs_end_read(sfs, entry);
+            return VFS_ERROR;
+        }
+        read = 0;
+        b1 = 0; // numfiles
+        for (r = 0 ; r < (int)SFS_MAX_FILES ; r++) {
+            sfs_direntry_t* e = (((sfs_direntry_t*)bat) + r);
+            if (e->inode > 0) {
+                stringcopy(((char*)buffer) + sizeof(uint32_t) + read, e->name, SFS_FILENAME_MAX);
+                b1++;
+                read += strlen(e->name) + 1;
+            }
+        }
+        // finally write number of files found
+        *((uint32_t*)buffer) = b1;
+        read += sizeof(uint32_t);
+    } else {
+        r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)(&inode)));
+        if (r == 0) {
             /* An error occured. */
-            semaphore_V(sfs->lock);
+            sfs_end_read(sfs, entry);
+            return VFS_ERROR;
+        }
+        /* Check that offset is inside the file */
+        if (offset < 0 || offset > (int)inode.filesize) {
+            sfs_end_read(sfs, entry);
             return VFS_ERROR;
         }
 
-        if(b1 == b2) {
-            /* Last block. Whole block might not be read.*/
-            memcopy(bufsize - read,
-                buffer,
-                (const uint32_t *)sfs->buffer_bat);
-            read += (bufsize - read);
+        /* Read at most what is left from the file. */
+        bufsize = MIN(bufsize,((int)inode.filesize) - offset);
+        if (bufsize == 0) {
+            sfs_end_read(sfs, entry);
+            return 0;
         }
-        else {
-            /* Read whole block */
-            memcopy(SFS_VBLOCK_SIZE,
-                buffer,
-                (const uint32_t *)sfs->buffer_bat);
-            read += SFS_VBLOCK_SIZE;
-            buffer = (void *)((uint32_t)buffer + SFS_VBLOCK_SIZE);
+
+
+        /* first block to be read from the disk */
+        b1 = offset / SFS_VBLOCK_SIZE;
+        /* last block to be read from the disk */
+        b2 = (offset+bufsize-1) / SFS_VBLOCK_SIZE;
+
+        /* Read blocks from b1 to b2. First and last are special cases because
+         * whole block might not be written to the buffer.
+         */
+        r = read_vblock(sfs->disk, inode.block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+        if(r == 0) {
+            /* An error occured. */
+            sfs_end_read(sfs, entry);
+            return VFS_ERROR;
         }
+
+        /* Count the number of the bytes to be read from the block and written to the buffer from the first block. */
+        read = MIN(SFS_VBLOCK_SIZE - (offset % SFS_VBLOCK_SIZE), bufsize);
+        memcopy(read, buffer, (const uint32_t *)(((uint32_t)bat) + (offset % SFS_VBLOCK_SIZE)));
+
+        buffer = (void *)((uint32_t)buffer + read);
         b1++;
+        while (b1 <= b2) {
+            r = read_vblock(sfs->disk, inode.block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+            if (r == 0) {
+                sfs_end_read(sfs, entry);
+                return VFS_ERROR;
+            }
+
+            if(b1 == b2) {
+                /* Last block. Whole block might not be read.*/
+                memcopy(bufsize - read, buffer, (const uint32_t *)bat);
+                read += (bufsize - read);
+            } else {
+                //kprintf("cxvcxv\n");
+                /* Read whole block */
+                memcopy(SFS_VBLOCK_SIZE, buffer, (const uint32_t *)bat);
+                read += SFS_VBLOCK_SIZE;
+                buffer = (void *)((uint32_t)buffer + SFS_VBLOCK_SIZE);
+            }
+            b1++;
+        }
     }
 
-    semaphore_V(sfs->lock);
+    // END OF READ-PERMITTED SECTION
+    sfs_end_read(sfs, entry);
+//kprintf("ddsfgsd %d\n", fileid);
     return read;
 }
 
 
+
+static void sfs_end_write(sfs_t* sfs, sfs_openfile_t* entry) {
+    lock_acquire(entry->io_lock);
+    entry->writer_tid = -1;
+    // signal to the waiting readers/writers that it's allowd to continue
+    condition_broadcast(entry->io_cond, entry->io_lock);
+    lock_release(entry->io_lock);
+    sfs_exit(sfs, entry, 0);
+}
 
 /**
  * Write at most datasize bytes from buffer to the file starting from
@@ -876,44 +1049,61 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     int b1, b2;
     int written=0;
     int r;
-    // TODO implement
-    sfs_enter(sfs, fileid);
+    sfs_openfile_t* entry;
+    sfs_inode_t inode;
+    char bat_t[SFS_VBLOCK_SIZE];
+    char* bat = bat_t;
 
-    semaphore_P(sfs->lock);
 
-    /* fileid is blocknum so ensure that we don't read system blocks
-       or outside the disk */
-    if(fileid < 2 || fileid > (int)sfs->totalvblocks) {
-        semaphore_V(sfs->lock);
+    /* fileid is blocknum so ensure that we don't read system blocks or outside the disk */
+    if(fileid < SFS_DIRECTORY_BLOCK || fileid > (int)sfs->totalvblocks) {
         return VFS_ERROR;
     }
 
-    r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_inode));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
+    entry = sfs_enter(sfs, fileid);
+    if (entry == NULL || entry->is_folder) {
+        // no entry found or entry is folder (not allowed to write into folders)
+        return VFS_ERROR;
+    }
+
+    // READ/WRITE sync
+    lock_acquire(entry->io_lock);
+    while(entry->writer_tid != -1) {
+        condition_wait(entry->io_cond, entry->io_lock);
+    }
+    entry->writer_tid = thread_get_current_thread();
+    while(entry->readernum > 0) {
+        condition_wait(entry->io_cond, entry->io_lock);
+    }
+    lock_release(entry->io_lock);
+
+
+    // NOW IT'S OK TO WRITE!
+    r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)(&inode)));
+    if (r == 0) {
+        sfs_end_write(sfs, entry);
         return VFS_ERROR;
     }
 
     /* check that start position is inside the disk */
-    if(offset < 0 || offset > (int)sfs->buffer_inode->filesize) {
-        semaphore_V(sfs->lock);
+    if (offset < 0 || offset > (int)inode.filesize) {
+        sfs_end_write(sfs, entry);
         return VFS_ERROR;
     }
 
     /* write at most the number of bytes left in the file */
-    datasize = MIN(datasize, (int)sfs->buffer_inode->filesize-offset);
+    datasize = MIN(datasize, (int)inode.filesize - offset);
 
-    if(datasize==0) {
-        semaphore_V(sfs->lock);
+    if (datasize == 0) {
+        sfs_end_write(sfs, entry);
         return 0;
     }
 
     /* first block to be written into */
     b1 = offset / SFS_VBLOCK_SIZE;
-
     /* last block to be written into */
     b2 = (offset+datasize-1) / SFS_VBLOCK_SIZE;
+
 
     /* Write data to blocks from b1 to b2. First and last are special
        cases because whole block might not be written. Because of possible
@@ -924,61 +1114,56 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
        is used because it is not needed (for allocation block) in this
        function. */
     written = MIN(SFS_VBLOCK_SIZE - (offset % SFS_VBLOCK_SIZE), datasize);
-    if(written < SFS_VBLOCK_SIZE) {
-        r = read_vblock(sfs->disk, sfs->buffer_inode->block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-        if(r == 0) {
-            /* An error occured. */
-            semaphore_V(sfs->lock);
+    if (written < SFS_VBLOCK_SIZE) {
+        r = read_vblock(sfs->disk, inode.block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+        if (r == 0) {
+            sfs_end_write(sfs, entry);
             return VFS_ERROR;
         }
     }
 
-    memcopy(written, (uint32_t *)(((uint32_t)sfs->buffer_bat) + (offset % SFS_VBLOCK_SIZE)), buffer);
-
-    r = write_vblock(sfs->disk, sfs->buffer_inode->block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-    if(r == 0) {
-        /* An error occured. */
-        semaphore_V(sfs->lock);
+    memcopy(written, (uint32_t *)(((uint32_t)bat) + (offset % SFS_VBLOCK_SIZE)), buffer);
+    r = write_vblock(sfs->disk, inode.block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+    if (r == 0) {
+        sfs_end_write(sfs, entry);
         return VFS_ERROR;
     }
 
     buffer = (void *)((uint32_t)buffer + written);
     b1++;
-    while(b1 <= b2) {
+    while (b1 <= b2) {
 
-        if(b1 == b2) {
+        if (b1 == b2) {
             /* Last block. If partial write, read the block first.
                Write anyway always to the beginning of the block */
             if((datasize - written)  < SFS_VBLOCK_SIZE) {
-                r = read_vblock(sfs->disk, sfs->buffer_inode->block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-                if(r == 0) {
-                    /* An error occured. */
-                    semaphore_V(sfs->lock);
+                r = read_vblock(sfs->disk, inode.block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+                if (r == 0) {
+                    sfs_end_write(sfs, entry);
                     return VFS_ERROR;
                 }
             }
 
-            memcopy(datasize - written, (uint32_t *)sfs->buffer_bat, buffer);
+            memcopy(datasize - written, (uint32_t *)bat, buffer);
             written = datasize;
         }
         else {
             /* Write whole block */
-            memcopy(SFS_VBLOCK_SIZE, (uint32_t *)sfs->buffer_bat, buffer);
+            memcopy(SFS_VBLOCK_SIZE, (uint32_t *)bat, buffer);
             written += SFS_VBLOCK_SIZE;
             buffer = (void *)((uint32_t)buffer + SFS_VBLOCK_SIZE);
         }
 
-        r = write_vblock(sfs->disk, sfs->buffer_inode->block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_bat));
-        if(r == 0) {
-            /* An error occured. */
-            semaphore_V(sfs->lock);
+        r = write_vblock(sfs->disk, inode.block[b1], ADDR_KERNEL_TO_PHYS((uint32_t)bat));
+        if (r == 0) {
+            sfs_end_write(sfs, entry);
             return VFS_ERROR;
         }
-
         b1++;
     }
 
-    semaphore_V(sfs->lock);
+    // END OF READ-PERMITTED SECTION
+    sfs_end_write(sfs, entry);
     return written;
 }
 

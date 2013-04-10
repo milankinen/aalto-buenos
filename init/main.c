@@ -62,10 +62,19 @@
 #   include "proc/process_table.h"
 #endif
 
-#include "kernel_tests/make_water.h"
-#include "kernel_tests/change_1_tests.h"
-#include "kernel_tests/canal.h"
-#include "kernel_tests/test_network.h"
+/* kernel tests */
+
+#ifdef CHANGED_1
+#   include "kernel_tests/make_water.h"
+#   include "kernel_tests/change_1_tests.h"
+#   include "kernel_tests/canal.h"
+#endif
+
+
+#ifdef CHANGED_3
+#   include "kernel_tests/test_network.h"
+#   include "kernel_tests/test_filesystem.h"
+#endif
 
 /**
  * Fallback function for system startup. This function is executed
@@ -136,7 +145,9 @@ void init_startup_fallback(void) {
         #endif /* CHANGED_ADDITIONAL_1 */
         #endif /* CHANGED_1 */
         #ifdef CHANGED_3
+        kwrite("Running kernel tests for phase 3...\n");
         run_nic_tests();
+        run_sfs_tests();
         #endif
     }
 #ifdef CHANGED_3

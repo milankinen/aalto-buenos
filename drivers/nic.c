@@ -63,10 +63,14 @@ device_t *nic_init(io_descriptor_t *desc)
 }
 
 int nic_dmabusy(nic_real_device_t *nic, nic_io_area_t *io) {
+    interrupt_status_t intr_status = _interrupt_disable();
+    
     spinlock_acquire(&nic->slock);
     int b = (NIC_STATUS_RBUSY(io->status) ||
              NIC_STATUS_SBUSY(io->status));
     spinlock_release(&nic->slock);
+
+    _interrupt_set_state(intr_status);
     return b;
 }
 
@@ -144,6 +148,8 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
     /* acquire dmalock */
     lock_acquire(nic->dmalock);
     /* synchronize memory mapped io with the spinlock */
+    interrupt_status_t intr_status = _interrupt_disable();
+
     spinlock_acquire(&nic->slock);
     /* set DMAADDR */
     io->dmaaddr = (uint32_t)frame;
@@ -157,6 +163,8 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
         KERNEL_PANIC("nic error occured");
     }
     spinlock_release(&nic->slock);
+
+    _interrupt_set_state(intr_status);
 
     /* wait */
     condition_wait(nic->csirq, nic->lock);
@@ -185,6 +193,8 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     lock_acquire(nic->dmalock);
 
     /* acquire spinlock to alter io field */
+    interrupt_status_t intr_status = _interrupt_disable();
+
     spinlock_acquire(&nic->slock);
     io->dmaaddr = (uint32_t)frame;
     io->command = NIC_COMMAND_RECEIVE;
@@ -193,6 +203,8 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
         KERNEL_PANIC("nic error occured");
     }
     spinlock_release(&nic->slock);
+
+    _interrupt_set_state(intr_status);
 
     /* wait for the message to be tranfered to frame */
     condition_wait(nic->crirq, nic->lock);
@@ -207,9 +219,13 @@ static uint32_t nic_frame_size(struct gnd_struct *gnd) {
     nic_io_area_t *io = (nic_io_area_t *)gnd->device->io_address;
     
     /* io area is synchronized by the spinlock */
+    interrupt_status_t intr_status = _interrupt_disable();
+
     spinlock_acquire(&nic->slock);
     uint32_t n = io->mtu;
     spinlock_release(&nic->slock);
+
+    _interrupt_set_state(intr_status);
 
     return n;
 }
@@ -219,9 +235,13 @@ static network_address_t nic_hwaddr(struct gnd_struct *gnd) {
     nic_io_area_t *io = (nic_io_area_t *)gnd->device->io_address;
 
     /* io area is synchronized by the spinlock */
+    interrupt_status_t intr_status = _interrupt_disable();
+
     spinlock_acquire(&nic->slock);
     network_address_t addr = io->hwaddr;
     spinlock_release(&nic->slock);
+
+    _interrupt_set_state(intr_status);
 
     return addr;
 }

@@ -2,6 +2,8 @@
  * NIC driver
  */
 
+#ifdef CHANGED_3
+
 #include "drivers/device.h"
 #include "drivers/gnd.h"
 #include "drivers/nic.h"
@@ -50,7 +52,6 @@ device_t *nic_init(io_descriptor_t *desc)
 
     spinlock_reset(&real_dev->slock);
     real_dev->lock = lock_create();
-    real_dev->dmalock = lock_create();
     real_dev->crxirq = condition_create();
     real_dev->crirq = condition_create();
     real_dev->csirq = condition_create();
@@ -123,12 +124,9 @@ static void nic_interrupt_handle(device_t *device) {
         condition_signal(real_dev->csirq, real_dev->lock);
         condition_signal(real_dev->csdma, real_dev->lock);
     }
-    else {
-        /* interrupt was not for us 
-         * do nothing */
-        spinlock_release(&real_dev->slock);
-        return;
-    }
+    /* else interrupt was not for us 
+     *      do nothing */
+
     spinlock_release(&real_dev->slock);
     return;
 }
@@ -145,8 +143,6 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
 
     addr = addr;
 
-    /* acquire dmalock */
-    //lock_acquire(nic->dmalock);
     /* synchronize memory mapped io with the spinlock */
     interrupt_status_t intr_status = _interrupt_disable();
 
@@ -168,7 +164,7 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
 
     /* wait */
     condition_wait(nic->csirq, nic->lock);
-    //lock_release(nic->dmalock);
+
     lock_release(nic->lock);
     return retval;
 }
@@ -180,17 +176,8 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     /* acquire nic */
     lock_acquire(nic->lock);
 
-    /*eikos me haluta menna venailemaan aina
-     * crxirq:ia riippumatta siita onko busy*/
-  //  while (nic_dmabusy(nic,io)) {
-        condition_wait(nic->crxirq, nic->lock);
-   // }
-
-    /* acquire dma_lock to prevent send overwriting
-     * dmaaddr in the case of simultaneous RXIRQ and SIRQ
-     */
-
-    //lock_acquire(nic->dmalock);
+    /* wait for RXIRQ */
+    condition_wait(nic->crxirq, nic->lock);
 
     /* acquire spinlock to alter io field */
     interrupt_status_t intr_status = _interrupt_disable();
@@ -209,7 +196,6 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     /* wait for the message to be tranfered to frame */
     condition_wait(nic->crirq, nic->lock);
 
-    //lock_release(nic->dmalock);
     lock_release(nic->lock);
     return 0;
 }
@@ -245,3 +231,5 @@ static network_address_t nic_hwaddr(struct gnd_struct *gnd) {
 
     return addr;
 }
+
+#endif /* CHANGED_3 */

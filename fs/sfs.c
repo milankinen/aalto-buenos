@@ -220,7 +220,6 @@ static sfs_openfile_t* sfs_enter_ext(sfs_t* sfs, int fileid, int parentid, int i
     if (fileid < 0) {
         return NULL;
     }
-    //kprintf("enter: %d, opening %d, deleting %d\n", fileid, is_open_op, mark_as_deleted);
     lock_acquire(sfs->openfile_lock);
     f = NULL;
     for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
@@ -270,7 +269,6 @@ static sfs_openfile_t* sfs_enter(sfs_t* sfs, int fileid) {
 }
 
 static void sfs_exit(sfs_t* sfs, sfs_openfile_t* entry, int is_close_op) {
-    //kprintf("exit: %d, closing %d\n", entry->fileid, is_close_op);
     lock_acquire(sfs->openfile_lock);
     if (is_close_op) {
         entry->times_opened--;
@@ -387,7 +385,6 @@ static int sfs_resolve_file_ext(sfs_t* sfs, char* path, int* parent_inode, int* 
     char* consumed_path;
     // buffer for path elements
     char filename[SFS_FILENAME_MAX];
-    //kprintf("resolving %s\n", path);
     if (!sfs_is_valid_path(path)) {
         return VFS_ERROR;
     }
@@ -412,12 +409,10 @@ static int sfs_resolve_file_ext(sfs_t* sfs, char* path, int* parent_inode, int* 
 
         ok = 0;
         for(i=0; i < SFS_MAX_FILES; i++) {
-            //kprintf("testing %s, %d (%s)\n", sfs->buffer_md[i].name, sfs->buffer_md[i].inode, filename);
             if(sfs->buffer_md[i].inode > 0 && stringcmp(sfs->buffer_md[i].name, filename) == 0) {
                 // found next inode
                 block = (int)sfs->buffer_md[i].inode;
                 ok = 1;
-                //kprintf("jmp\n");
                 break;
             }
         }
@@ -473,14 +468,14 @@ fs_t * sfs_init(gbd_t *disk)
     /* check semaphore availability before memory allocation */
     sem = semaphore_create(1);
     if (sem == NULL) {
-        //kprintf("sfs_init: could not create a new semaphore.\n");
+        kprintf("sfs_init: could not create a new semaphore.\n");
         return NULL;
     }
 
     lock = lock_create();
     if (lock == NULL) {
         semaphore_destroy(sem);
-        //kprintf("sfs init: could not create a new lock.\n");
+        kprintf("sfs init: could not create a new lock.\n");
         return NULL;
     }
 
@@ -488,7 +483,7 @@ fs_t * sfs_init(gbd_t *disk)
     if (addr == 0) {
         semaphore_destroy(sem);
         lock_destroy(lock);
-        //kprintf("sfs_init: could not allocate memory.\n");
+        kprintf("sfs_init: could not allocate memory.\n");
         return NULL;
     }
     addr = ADDR_PHYS_TO_KERNEL(addr);      /* transform to vm address */
@@ -503,7 +498,7 @@ fs_t * sfs_init(gbd_t *disk)
         semaphore_destroy(sem);
         lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-        //kprintf("sfs_init: Error during disk read. Initialization failed.\n");
+        kprintf("sfs_init: Error during disk read. Initialization failed.\n");
         return NULL;
     }
 
@@ -535,7 +530,6 @@ fs_t * sfs_init(gbd_t *disk)
 
     sfs->totalblocks  = MIN(disk->total_blocks(disk), 8*SFS_VBLOCK_SIZE);
     sfs->totalvblocks = MIN(disk->total_blocks(disk) / SFS_BLOCKS_PER_VBLOCK, 8*SFS_VBLOCK_SIZE);
-    ////kprintf("blocks: p=%d, v=%d, d=%d\n", 8*SFS_VBLOCK_SIZE, 8*SFS_VBLOCK_SIZE, disk->total_blocks(disk));
     sfs->disk         = disk;
 
 
@@ -625,7 +619,6 @@ int sfs_open(fs_t *fs, char *filename)
 
     sfs = (sfs_t *)fs->internal;
 
-    //kprintf("open %s\n", filename);
     // test that file exists
     inode = sfs_resolve_file(sfs, filename, &parent_inode);
     if (inode == VFS_ERROR) {
@@ -643,7 +636,6 @@ int sfs_open(fs_t *fs, char *filename)
     // file entry immediately and return error to indicate that file is no longer
     // available
     sfs_exit(sfs, entry, is_deleted);
-    //kprintf("open-end %s\n", filename);
     return is_deleted ? VFS_NOT_FOUND : inode;
 }
 
@@ -659,11 +651,9 @@ int sfs_open(fs_t *fs, char *filename)
  */
 int sfs_close(fs_t *fs, int fileid)
 {
-    //kprintf("close %d\n", fileid);
     sfs_t *sfs;
     sfs_openfile_t* entry;
 
-    ////kprintf("qwewerrte\n");
     sfs = (sfs_t *)fs->internal;
     entry = sfs_enter(sfs, fileid);
     if (entry == NULL) {
@@ -911,7 +901,6 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     char bat_t[SFS_VBLOCK_SIZE];
     char* bat = bat_t;
 
-    //kprintf("asdsad %d\n", fileid);
     /* fileid is blocknum so ensure that we don't read system blocks or outside the disk */
     if(fileid < SFS_DIRECTORY_BLOCK || fileid > (int)sfs->totalvblocks) {
         return VFS_ERROR;
@@ -1012,7 +1001,6 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
                 memcopy(bufsize - read, buffer, (const uint32_t *)bat);
                 read += (bufsize - read);
             } else {
-                //kprintf("cxvcxv\n");
                 /* Read whole block */
                 memcopy(SFS_VBLOCK_SIZE, buffer, (const uint32_t *)bat);
                 read += SFS_VBLOCK_SIZE;
@@ -1024,7 +1012,6 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 
     // END OF READ-PERMITTED SECTION
     sfs_end_read(sfs, entry);
-//kprintf("ddsfgsd %d\n", fileid);
     return read;
 }
 

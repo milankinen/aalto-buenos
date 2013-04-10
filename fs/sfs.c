@@ -129,6 +129,7 @@ static void _delete(sfs_t* sfs, int fileid, int parentid, int is_folder) {
 
     // must lock sfs because we are using global buffers
     semaphore_P(sfs->lock);
+    //kprintf("SFS: actual delete, %d\n", fileid);
 
     /* Read allocation block of the device and inode block of the file.
        Free reserved blocks (marked in inode) from allocation block. */
@@ -184,6 +185,7 @@ static void _delete_from_dirtree(sfs_t* sfs, int fileid, int parentid) {
     semaphore_P(sfs->lock);
     /* Free entry from parent directory inode (if parent direcotry is not deleted before this operation) */
     if (parentid > 0) {
+        //kprintf("SFS: delete from dirtree, %d\n", fileid);
         r = read_vblock(sfs->disk, parentid, ADDR_KERNEL_TO_PHYS((uint32_t)sfs->buffer_md));
         if (r == 0) {
             /* An error occured. */
@@ -217,7 +219,7 @@ static sfs_openfile_t* sfs_enter_ext(sfs_t* sfs, int fileid, int parentid, int i
     if (fileid < 0) {
         return NULL;
     }
-    kprintf("enter: %d, opening %d, deleting %d\n", fileid, is_open_op, mark_as_deleted);
+    //kprintf("enter: %d, opening %d, deleting %d\n", fileid, is_open_op, mark_as_deleted);
     lock_acquire(sfs->openfile_lock);
     f = NULL;
     for (i = 0 ; i < SFS_MAX_OPEN_FILES ; i++) {
@@ -267,7 +269,7 @@ static sfs_openfile_t* sfs_enter(sfs_t* sfs, int fileid) {
 }
 
 static void sfs_exit(sfs_t* sfs, sfs_openfile_t* entry, int is_close_op) {
-    kprintf("exit: %d, closing %d\n", entry->fileid, is_close_op);
+    //kprintf("exit: %d, closing %d\n", entry->fileid, is_close_op);
     lock_acquire(sfs->openfile_lock);
     if (is_close_op) {
         entry->times_opened--;
@@ -285,6 +287,8 @@ static void sfs_exit(sfs_t* sfs, sfs_openfile_t* entry, int is_close_op) {
 static int sfs_is_valid_filename_char(char ch) {
     return  (ch == '_') ||
             (ch == '-') ||
+            (ch == '.') ||
+            (ch == '~') ||
             (ch == ' ') ||
             (ch >= 48 && ch <= 57) ||   // 0-9
             (ch >= 65 && ch <= 90) ||   // A-Z
@@ -382,7 +386,7 @@ static int sfs_resolve_file_ext(sfs_t* sfs, char* path, int* parent_inode, int* 
     char* consumed_path;
     // buffer for path elements
     char filename[SFS_FILENAME_MAX];
-    kprintf("resolving %s\n", path);
+    //kprintf("resolving %s\n", path);
     if (!sfs_is_valid_path(path)) {
         return VFS_ERROR;
     }
@@ -407,12 +411,12 @@ static int sfs_resolve_file_ext(sfs_t* sfs, char* path, int* parent_inode, int* 
 
         ok = 0;
         for(i=0; i < SFS_MAX_FILES; i++) {
-            kprintf("testing %s, %d (%s)\n", sfs->buffer_md[i].name, sfs->buffer_md[i].inode, filename);
+            //kprintf("testing %s, %d (%s)\n", sfs->buffer_md[i].name, sfs->buffer_md[i].inode, filename);
             if(sfs->buffer_md[i].inode > 0 && stringcmp(sfs->buffer_md[i].name, filename) == 0) {
                 // found next inode
                 block = (int)sfs->buffer_md[i].inode;
                 ok = 1;
-                kprintf("jmp\n");
+                //kprintf("jmp\n");
                 break;
             }
         }
@@ -699,6 +703,10 @@ int sfs_create(fs_t *fs, char *filename, int size) {
     if (is_folder) {
         // folders don't need addition inodes for data storing
         size = 0;
+    } else {
+        if (size < 0) {
+            return VFS_ERROR;
+        }
     }
     uint32_t numblocks = (size + SFS_BLOCK_SIZE - 1) / SFS_BLOCK_SIZE;
     uint32_t numvblocks = numblocks / SFS_BLOCKS_PER_VBLOCK + ((numblocks % SFS_BLOCKS_PER_VBLOCK) ? 1 : 0);

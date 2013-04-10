@@ -107,9 +107,7 @@ static void test_multiple_send_receive() {
    port1 = 7071;
     port2 = 7072;
     test_send_receive();
- /*   TID_t tid1 = thread_create(&write_bytes_thread, 0);
-    thread_run(tid1);
-    */
+
     thread_sleep(2000);
     port1 = 7171;
     port2 = 7172;
@@ -117,12 +115,6 @@ static void test_multiple_send_receive() {
 
     test_send_receive();
 
-
-  //  test_send_receive();
-  /*    TID_t tid = thread_create(&receive_bytes_thread, 0);
-    thread_run(tid);
-    TID_t tid2 = thread_create(&write_bytes_thread, 0);
-    thread_run(tid2);*/
 }
 
 void run_nic_tests() {
@@ -136,6 +128,7 @@ void run_nic_tests() {
      * one sends and one receives packets*/
     kprintf("starting test_send_receive\n");
     test_send_receive();
+    thread_sleep(1000);
     /*sleep until test is finished*/
     while (finished > 0) {
         thread_sleep(1000);

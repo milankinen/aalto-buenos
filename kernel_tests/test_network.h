@@ -8,8 +8,8 @@
 #ifndef TEST_NETWORK_H_
 #define TEST_NETWORK_H_
 
-void network_test();
-void network_test2();
+void write_to_network_test();
+void receive_from_network_test();
 void run_nic_tests();
 
 #endif /* TEST_NETWORK_H_ */

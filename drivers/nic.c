@@ -76,7 +76,6 @@ int nic_dmabusy_without_slock(nic_io_area_t *io) {
 }
 
 static void nic_interrupt_handle(device_t *device) {
-    kprintf("INTERRUPT!\n");
     nic_real_device_t *real_dev = device->real_device;
     nic_io_area_t *io = (nic_io_area_t *)device->io_address;
 
@@ -183,7 +182,6 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
      * dmaaddr in the case of simultaneous RXIRQ and SIRQ
      */
 
-    kprintf("acquire recv dmalock\n");
     lock_acquire(nic->dmalock);
 
     /* acquire spinlock to alter io field */

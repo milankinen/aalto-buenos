@@ -5,6 +5,7 @@
 #include "net/socket.h"
 #include "net/pop.h"
 #include "kernel/assert.h"
+#include "test_network.h"
 
 #define PORT1 9191
 #define PORT2 9192
@@ -16,6 +17,8 @@
 #define NADDR2 251728437
 
 #define LOOPSIZE 10
+
+int finished = 0;
 /*reads hwaddr and mtu of the nic device
  *specified in yams.conf
  *meant to run as a unit test on a single buenos/yams
@@ -31,14 +34,25 @@ static void test_nicIOArea() {
 
 }
 
-void run_nic_tests() {
-    test_nicIOArea();
+
+
+
+static void write_bytes_thread(uint32_t dummy){
+    dummy = dummy;
+    write_to_network_test();
+}
+
+static void receive_bytes_thread(uint32_t dummy){
+    dummy = dummy;
+    receive_from_network_test();
+
+
 }
 
 /*write bytes to socket
  * meant to interract with other buenos instances
  */
-void network_test() {
+void write_to_network_test() {
     uint16_t port1 = PORT1;
     uint16_t port2 = PORT2;
 
@@ -58,7 +72,8 @@ void network_test() {
 /*read bytes from socket
  *meant to interract with other buenos instances
  */
-void network_test2() {
+void receive_from_network_test() {
+
 
     char buf[100];
     char expectedmsg[] = "aaa";
@@ -82,6 +97,24 @@ void network_test2() {
 
         expectedmsg[0]++;
     }
-
+    /*the test is now finished*/
+    finished = 1;
 }
 
+void run_nic_tests() {
+/*inside local buenos so redefine NADDR */
+    test_nicIOArea();
+
+/*two threads inside the same buenos send and receive packets*/
+    TID_t tid = thread_create(&receive_bytes_thread, 0);
+    thread_run(tid);
+
+    TID_t tid2 = thread_create(&write_bytes_thread, 0);
+    tid2 = tid2;
+    thread_run(tid2);
+
+    /*sleep until test is finished*/
+    while(finished == 0){
+        thread_sleep(1000);
+    }
+}

@@ -172,7 +172,6 @@ void init_startup_thread(uint32_t arg)
 
     kprintf("Initializing networking\n");
     network_init();
-
     if(bootargs_get("initprog") == NULL) {
 	kprintf("No initial program (initprog), dropping to fallback\n");
 	init_startup_fallback();

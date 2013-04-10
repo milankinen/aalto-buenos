@@ -56,7 +56,7 @@ device_t *nic_init(io_descriptor_t *desc)
     real_dev->csirq = condition_create();
     real_dev->csdma = condition_create();
 
-    irq_mask = 1 << (desc->irq + 11);
+    irq_mask = 1 << (desc->irq + 10);
     interrupt_register(irq_mask, nic_interrupt_handle, dev);
 
     return dev;
@@ -76,6 +76,7 @@ int nic_dmabusy_without_slock(nic_io_area_t *io) {
 }
 
 static void nic_interrupt_handle(device_t *device) {
+    kprintf("INTERRUPT!\n");
     nic_real_device_t *real_dev = device->real_device;
     nic_io_area_t *io = (nic_io_area_t *)device->io_address;
 
@@ -138,13 +139,7 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
     while (nic_dmabusy(nic,io))
         condition_wait(nic->csdma, nic->lock);
 
-    /* interrupt handler has now released this thead to run */
-    /* set up the frame:
-     *  first word destination address
-     *  secend word sender address
-     */
-    ((uint32_t *)frame)[0] = addr;
-    ((uint32_t *)frame)[1] = nic_hwaddr(gnd);
+    addr = addr;
 
     /* acquire dmalock */
     lock_acquire(nic->dmalock);
@@ -169,13 +164,18 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
 
     /* acquire nic */
     lock_acquire(nic->lock);
-    while (nic_dmabusy(nic,io)) {
+
+    /*eikos me haluta menna venailemaan aina
+     * crxirq:ia riippumatta siita onko busy*/
+  //  while (nic_dmabusy(nic,io)) {
         condition_wait(nic->crxirq, nic->lock);
-    }
+   // }
 
     /* acquire dma_lock to prevent send overwriting
      * dmaaddr in the case of simultaneous RXIRQ and SIRQ
      */
+
+    kprintf("acquire recv dmalock\n");
     lock_acquire(nic->dmalock);
 
     /* acquire spinlock to alter io field */
@@ -186,6 +186,7 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
 
     /* wait for the message to be tranfered to frame */
     condition_wait(nic->crirq, nic->lock);
+
     lock_release(nic->dmalock);
     lock_release(nic->lock);
     return 0;

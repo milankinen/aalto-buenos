@@ -1,0 +1,301 @@
+Phase 3 README
+=================
+Group 3
+Lauri Hartikka, 79956E 
+Jaakko Hujanen, 78842N
+Matti Lankinen, 82105H
+
+
+Assignment 1 - Device Driver
+---------------------------------------
+In this assignment device driver for network interface card (NIC) was implemented. The
+driver consist of implementation of the generic network device (GND) interface
+defined in drivers/gnd.h. Also interrupt handler and of course init function
+were implemented.
+
+The following files were changed: - drivers/drivers.c - drivers/nic.c -
+	drivers/nic.h.
+
+Init consist of allocating memory for device type, GND type and real device
+type. Real device was defined to handle synchronization of the NIC. It
+has spinlock for accessing the memory mapped IO area, a lock variable to
+synchronize send and receive functions and four condition variables to enable
+waiting for different interrupts. It is defined in drivers/nic.h. Furthermore
+init sets up the fields in device, GND and real device type. Finally, it
+registers the interrupt handler.
+
+Interrupt handler is the core of the driver. By signaling condition variables
+	it synchronizes send and receive functions. The memory field it
+	modifies are protected by spinlock since using sleep queue is not
+	allowed during interrupt handling. Three different interrupts are
+	handled: - RXIRQ, frame ready to be transferred from read buffer -
+	RIRQ, frame transferred from read buffer to memory - SIRQ, frame
+	transferred from memory to send buffer
+
+All transfers are done by DMA. This means that there can be only one
+transfer at a time. Handling RXIRQ leads to receive function starting memory
+transfer. Thus, RXIRQ is handled only when there is no ongoing transfer
+action. When SIRQ occurs later, DMA transfer is then over, the RXIRQ is
+handled before the SIRQ. There should not be RXIRQ and RIRQ at the same time
+since RIRQ will be generated after RXIRQ is handled and there cannot be new
+RXIRQ before RIRQ is handled. This is because handling of RIRQ will allow
+NIC to receive a new frame by resetting the RXBUSY bit.
+
+The handling is following: RXIRQ: If there is no DMA tranfer, reset RXIRQ
+bit and wake up RXIRQ sleepers.  RIRQ:
+	Reset RIRQ and RXBUSY bits and	wake up RIRQ and DMA sleepers.
+SIRQ: Reset SIRQ bit and wake up SIRQ and DMA sleepers.
+
+The implementation is pretty straightforward: Condition variables are used
+to enable waiting for specific interrupt. DMA condition variable is used for
+send function to proceed whereas receive function will need RXBUSY interrupt to
+continue. Threads waiting on DMA are woken up when DMA action ends that is when
+send or receive transfers have finished i.e. when SIRQ or RIRQ are generated.
+
+The send implementation is now the following: - Synchronize with lock defined
+in real device type.  - Wait for DMA condition variable.  - After waking up
+acquire the spinlock to do
+  memory mapped IO. Set up the DMAADDR and COMMAND fields. Release spinlock.
+- Wait on SIRQ condition variable.  - Release lock and return.
+
+The receive is implemented: - Acquire lock.
+- Wait for RXIRQ condition variable.  - After waking up acquire the spinlock.
+  Set up the DMAADDR and COMMAND fields.  Release spinlock.
+- Wait on SIRQ condition variable.  - Release lock and return.
+
+Also functions for getting frame size and hardware address were
+	implemented. The implementations are highly similar: - Acquire
+	spinlock.  - Read the corresponding field in the IO area.  -
+	Release spinlock.  - Return the read value.
+
+
+
+Assignment 2 - Filesystem Concurrency
+-------------------------------------------
+
+The following files were changed/created: - fs/filesystems.c (register SFS)
+	- fs/sfs.h - fs/sfs.c (actual implementation)
+
+Our concurrency implementation is based on global “open file table” (OFT)
+which keep record of opened file handles. When file is opened first time,
+its information is stored into one OFT entry (located in module sfs.c). Entry
+keeps record of opening numbers so next openings don’t take new entries,
+but existing entry is updated instead to match the changed open counter. One
+OFT entry contains following fields:
+
+typedef struct { lock_t*     io_lock; cond_t*	  io_cond; int
+    times_opened; int	      readernum; TID_t	     writer_tid;
+    int		fileid; int	    parentid; int	  is_folder;
+    int		is_deleted;
+} sfs_openfile_t;
+
+
+# READ/WRITE
+
+Locks and condition variables are needed for actual read/write sync, as
+well as “readernum” and “writer_tid”. Other fields are used in
+delete/folder operations (explained later).
+
+Open file table is allocated during SFS mount and it uses same memory block
+which is allocated for inode/allocation block data buffers. We have also
+allocated single lock for OFT processing operations. The actual heart of
+the the synchronization are the operations “sfs_enter” and “sfs_exit”.
+
+SFS_ENTER is a function (in module sfs.c) which takes the file handle
+(fileid), locks the global OFT table lock, traverses through the OFT and
+searches for entry with same fileid. If entry is found, then times_opened
+counter is incremented (if is_open flag is set when calling method, NOT used
+in reads/writes) and returns the entry to caller. sfs_enter is called ALWAYS
+ONCE at the beginning of sfs_read/sfs_write functions.
+
+When entry is received, read/write operations can be synchronized by
+using entry’s locks/conditions. BECAUSE SYNCHRONIZATION IS DONE BY USING
+LOCKS/CONDITIONS PER ENTRY, IT MAKES POSSIBLE FOR MULTIPLE FILE READ/WRITE
+OPERATIONS. We have modified the reading/writing logic that they are using
+local buffers (allocated from stack) for read/write operations so that there
+is no need for e.g. global inode buffer synchronization (otherwise the whole
+entry mechanism would have been pointless).
+
+When doing a READ operation file entry is synced with the following algorithm:
+ lock e.io_lock while e.writer_tid != NO_TID # wait until no writers
+   wait e.io_cond e.readers_num++ release e.io_lock
+
+For WRITE operation, sync algorithm is following: lock e.io_lock while
+  e.writer_tid != NO_TID # wait until no writers
+    wait e.io_cond e.writer_tid = my_tid() while e.readers_num > 0 # wait
+  until no readers
+    wait e.io_cond release e.io_lock
+
+Basically these algorithms ensure that readers don’t go into the critical
+section if there is a writer performing operation OR there is a writer
+waiting for entering. Writers must wait until there is no other writer in the
+critical section. After that they can mark themselves as waiters. After that,
+writers must wait until all readers has exited from the critical section. This
+ensures 0..n readers and writer isolation (writes are serialized).
+
+SFS_EXIT (in module sfs.c) is a counter function for sfs_enter. It is called
+ALWAYS just before exiting sfs_read/sfs_write functions (both success and
+error cases). sfs_exit reverses the counter changes make by sfs_enter. If
+entry is not opened anymore after sfs_exit, it releases the entry (note
+that this function uses also global OFT table lock so it’s safe to modify
+entries in sfs_exit).
+
+Before read/write operations use sfs_exit, they must release their
+  synchronization counters. For READ operation, releasing uses the following
+  algorithm: lock e.io_lock e.readers_num-- broadcast e.io_cond release
+  e.io_lock
+
+For WRITE, the release algorithm is following: lock e.io_lock e.writer_tid =
+  NO_TID broadcast e.io_cond release e.io_lock
+
+Basically these algorithms just increment the counter and notify the entry
+so that if there are other executors waiting for read/write, then they can
+wake up and try to execute their actions.
+
+Of course there are other operations, such as sfs_open and sfs_create. They
+are using global inode/bat/md buffers for their operations so every time when
+one/many of those buffers are being used, then the operation is blocked with
+global lock (original from TFS implementation). However, those buffers are
+not needed for READ/WRITE -> true simultaneous reading/writing is possible
+per file. Multiple files can also be written simultaneously.
+
+
+# DELETE
+
+For file deletions, we use OFT entry field “is_deleted”. When sfs_remove
+is called, then OFT entry is received with sfs_enter method. Same time
+we enable the entry’s is_deleted field. When this is done first time,
+we do a “pre-initial deletion phase” which removes the file handle
+from its parent directory list (in disk) so that next sfs_open/sfs_remove
+operations won’t work for deleted file. After that, sfs_remove closes the
+file entry immediately. If there are no other processes using the entry,
+then the actual deletion takes place. Delete process is same as in TFS
+implementation: just mark file’s inodes as free from allocation table. If
+there are other processes using the file entry, then sfs_remove doesn’t do
+more - when the last process closes the file entry, then the actual deletion
+is triggered. Deletion is triggered also before unmounting file system,
+if there are open file entries just before umount.
+
+
+# WRITE OPERATION ISOLATION
+
+ATTENTION!!! We don’t know, how course staff will test the SFS implementation
+but if the tests are done from userland level, then serializable behaviour
+of write operations may look like broken. This is because our syscall layer
+buffers the read/write operations to 512 byte blocks and loops those block
+(which was not forbidden in phase 2!). For example userland write operation
+with buffer size 742B will contain two separate write operations (512B+230B)
+from SFS viewpoint so there is possibility that pending read operations can
+access the critical section before the latter write operation, thus give biased
+results from automated tests! If tests are executed from VFS level (like we
+are doing) or even SFS level, then the implementation is fully serializable.
+
+
+
+Assignment 3 - Directories 
+--------------------------------------
+
+The following files were changed/created: - fs/filesystems.c (register SFS)
+	- fs/sfs.h - fs/sfs.c (actual implementation)
+
+# IMPLEMENTATION (terms: folder = directory)
+
+Our core idea was to maintain 100% compatibility with TFS disk images because
+we wanted to use tfstool for our disk image creations (all our previous tests
+depend on that). The original TFS implementation contained TFS_DIRECTORY_BLOCK
+which was the base for our directory implementation.
+
+NOTE!!! Because the original assignment (before correction) stated that
+we should use 128 byte sectors, we implemented “virtual blocks” which
+basically use multiple physical blocks to form a “virtual block” with
+same size as original TFS block, thus preserving TFS compability. When the
+correction email came, we didn’t have enough strength to remove those vblock
+implementations, we just told that 1 physical block = 1 virtual block. Thus,
+the code may contain some vblock_... sections that doesn’t affect the
+actual behaviour at all.
+
+When file entry is opened with sfs_enter function (see above) then the opener
+must provide information for opened file entry. This information contains
+file’s parent folder inode and entry’s type (file/folder). We have
+created following helper functions (in module sfs.c) to get those informations:
+
+int sfs_resolve_file(sfs_t* sfs, char* path, int* parent_inode) int
+sfs_is_folder(const char* path)
+
+SFS_RESOLVE_FILE splits the path into elements so that
+e.g. ‘/foo/bar/foobar’ will be [‘/’, ‘bar/’, ‘foobar’]. Then
+it traverses the disk inodes until it finds the final path element (=
+file/folder) or returns error if path traversing ends to error (folders or
+file is missing). Each folder is same block as TFS_DIRECTORY_BLOCK and has
+100% same data structure.
+
+Note that the splitted path ‘/’, e.g. ‘bar/’. This is our way to
+separate folders from normal files: if “file’s” name inside directory
+block ends with ‘/’ then it is considered as a folder. ‘/’ at the
+beginning of the path indicates always TFS_DIRECTORY_BLOCK. All file/folder
+search traversals start from TFS_DIRECTORY_BLOCK root block. Because we are
+traversing one folder inode at time, we can preserve the state of previous
+folder inode and return it to the caller when the actual file/folder is
+found. Caller can then use both inode indexes for entry opening.
+
+SFS_IS_FOLDER is very simple. It uses the previous convention to detect if
+path ends with ‘/’. There are also other limitations for paths. Files and
+folders can be only 15 characters long (with ‘/’) and they can contain
+characters from set [a-zA-Z_-.~ ]. Paths validity is checked always before
+traversing (because of buffer overflows).
+
+
+# READING AND UPDATING
+
+When folder OFT entry is populated, then folders can be used like normal
+files. However, writing to folder entry is not permitted and returns always
+VFS_ERROR (folder contents can only be changed with delete/create operations).
+
+Because VFS doesn’t support special directory readings/listings we have used
+a “hack” to transfer folder content information to the userland. This
+can be done by using sfs_read (SYSCALL_READ) and buffer that is at least
+same size than readed sector. Reading also requires that offset is set to
+0. When block is readed from disk, it contents are written into buffer with
+following structure. Example for listing files can be found from userland
+program ‘ls’ (module: tests/ls.c).
+
+ <num_files_folders:uint32> <name1:char*> <name2:char*> ...
+
+When user creates new files/sub-folders, their inode references are stored
+into folder block just like TFS_DIRECTORY_BLOCK implementation. When
+files/sub-folders are deleted, their references are removed from parent
+folder block (100% same behaviour than TFS_DIRECTORY_BLOCK).
+
+
+# DELETING FILES/FOLDERS
+
+When a folder is actually deleted, we must take into account that there might
+be some other file entries open that are located inside the deleted folder. If
+those entries are deleted after the actual parent folder deletion, there is a
+great danger at re-writing sectors that are not used anymore (or worse: used
+by new file/folder!). Thus, every time when folder entry is actually deleted,
+the OFT entries are traversed and their parent references are removed. If
+those files are deleted afterwards, then they don’t do the “pre-deletion
+phase” anymore and try to update block that doesn’t exist anymore.
+
+Root folder ‘/’ can never be deleted.
+
+
+# NOTES WHEN USING USERLAND PROGRAMS
+
+All previous userland programs and files are available with SFS mounting. The
+only difference is that they must be prefixed with ‘/’ (they are
+located in the root folder) . For example using touch will be: “/touch
+/myfile.txt”. The reason for this behaviour is that we think that the
+path resolving is NOT file system's problem, but should be done by shell
+for example. However, updating the shell to support path resolving was not
+required by this phase so we didn’t implement it.
+
+To start the shell, you must use: sh startprog.sh /shell
+
+
+Assignment 4 - Remote procedure calls (RPC) [optional]
+---------------------------------------------------------
+
+Not implemented.
+

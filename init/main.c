@@ -151,13 +151,15 @@ void init_startup_fallback(void) {
         #endif
     }
 #ifdef CHANGED_3
+#define PORT1 9091
+#define PORT2 9092
     else if(bootargs_get("network1") != NULL){
         kwrite("Starting network test1\n");
-        write_to_network_test();
+        write_to_network_test(PORT1, PORT2);
     }
     else if(bootargs_get("network2") != NULL){
         kwrite("Starting network test2\n");
-        receive_from_network_test();
+        receive_from_network_test(PORT1, PORT2);
     }
 #endif
     /* Nothing else to do, so we shut the system down. */

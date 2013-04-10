@@ -146,7 +146,7 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
     addr = addr;
 
     /* acquire dmalock */
-    lock_acquire(nic->dmalock);
+    //lock_acquire(nic->dmalock);
     /* synchronize memory mapped io with the spinlock */
     interrupt_status_t intr_status = _interrupt_disable();
 
@@ -168,7 +168,7 @@ static int nic_send(struct gnd_struct *gnd, void *frame, network_address_t addr)
 
     /* wait */
     condition_wait(nic->csirq, nic->lock);
-    lock_release(nic->dmalock);
+    //lock_release(nic->dmalock);
     lock_release(nic->lock);
     return retval;
 }
@@ -190,7 +190,7 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
      * dmaaddr in the case of simultaneous RXIRQ and SIRQ
      */
 
-    lock_acquire(nic->dmalock);
+    //lock_acquire(nic->dmalock);
 
     /* acquire spinlock to alter io field */
     interrupt_status_t intr_status = _interrupt_disable();
@@ -209,7 +209,7 @@ static int nic_recv(struct gnd_struct *gnd, void *frame) {
     /* wait for the message to be tranfered to frame */
     condition_wait(nic->crirq, nic->lock);
 
-    lock_release(nic->dmalock);
+    //lock_release(nic->dmalock);
     lock_release(nic->lock);
     return 0;
 }

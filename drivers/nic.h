@@ -2,6 +2,8 @@
  * Network interface card (NIC) driver
  */
 
+#ifdef CHANGED_3
+
 #ifndef DRIVERS_NIC_H
 #define DRIVERS_NIC_H
 
@@ -56,15 +58,17 @@ typedef struct {
 /* spinlock for synchronization in interrupt handler and for
  * memory mapped io
  * lock for synchronization in send/receive
- * ccndition variables for waiting in send/receive
+ * condition variables for waiting in send/receive:
+ *  - crxirq is used to wait for RXIRQ
+ *  - crirq is used to wait for RIRQ
+ *  - csirq is used to wait for SIRQ
+ *  - csdma is used to wait in send to before setting commands in io area
  *
- * if both lock and iolock are used acquire and release iolock
- * inside lock and spinlock must always be the innermost.
+ * spinlock must always be locked inside lock if both locks are required.
  */
 typedef struct {
     spinlock_t slock;
     lock_t *lock;
-    lock_t *dmalock;
     cond_t *crxirq;
     cond_t *crirq;
     cond_t *csirq;
@@ -74,3 +78,5 @@ typedef struct {
 device_t *nic_init(io_descriptor_t *desc);
 
 #endif /* DRIVERS_NIC_H */
+
+#endif /* CHANGED_3 */

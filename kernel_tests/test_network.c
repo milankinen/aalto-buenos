@@ -58,13 +58,13 @@ void write_to_network_test() {
 
     int i;
     sock_t s = socket_open(PROTOCOL_POP, port1);
+    kprintf("Socket created to port: %d\n", port1);
     char msg[] = "aaa";
     for (i = 0; i < LOOPSIZE; i++) {
-        kprintf("Socket created to port: %d\n", port1);
         int n = socket_sendto(s, NETWORK_BROADCAST_ADDRESS, port2, msg,
                 10);
         msg[0]++;
-        kprintf("wrote %d chars to socket\n", n);
+        kprintf("wrote max %d chars to socket\n", n);
         thread_sleep(1000);
     }
 }

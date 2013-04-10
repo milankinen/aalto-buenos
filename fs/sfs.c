@@ -15,6 +15,7 @@
 #include "fs/sfs.h"
 #include "lib/libc.h"
 #include "lib/bitmap.h"
+#include "lib/debug.h"
 
 
 
@@ -873,6 +874,7 @@ int sfs_remove(fs_t *fs, char *filename)
 
 
 static void sfs_end_read(sfs_t* sfs, sfs_openfile_t* entry) {
+    DEBUG("verbose", "SFS: [%d] exit read\n", thread_get_current_thread());
     lock_acquire(entry->io_lock);
     entry->readernum--;
     if (entry->readernum == 0) {
@@ -928,6 +930,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     entry->readernum++;
     lock_release(entry->io_lock);
 
+    DEBUG("verbose", "SFS: [%d] enter read (%d bytes) \n", thread_get_current_thread(), bufsize);
     // NOW IT'S OK TO READ!
     if (entry->is_folder) {
         // directory reading is a little bit different from normal files:
@@ -1028,6 +1031,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 
 
 static void sfs_end_write(sfs_t* sfs, sfs_openfile_t* entry) {
+    DEBUG("verbose", "SFS: [%d] exit write\n", thread_get_current_thread());
     lock_acquire(entry->io_lock);
     entry->writer_tid = -1;
     // signal to the waiting readers/writers that it's allowd to continue
@@ -1085,7 +1089,7 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     }
     lock_release(entry->io_lock);
 
-
+    DEBUG("verbose", "SFS: [%d] enter write (%d bytes)\n", thread_get_current_thread(), datasize);
     // NOW IT'S OK TO WRITE!
     r = read_vblock(sfs->disk, fileid, ADDR_KERNEL_TO_PHYS((uint32_t)(&inode)));
     if (r == 0) {

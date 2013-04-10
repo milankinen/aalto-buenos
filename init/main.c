@@ -136,17 +136,17 @@ void init_startup_fallback(void) {
 
     else if (bootargs_get("kernel_tests") != NULL) {
         #ifdef CHANGED_1
-        kwrite("Running kernel tests for phase 1...\n");
-        run_lock_tests();
-        run_cond_tests();
-        run_thread_sleep_tests();
+        //kwrite("Running kernel tests for phase 1...\n");
+        //run_lock_tests();
+        //run_cond_tests();
+        //run_thread_sleep_tests();
         #ifdef CHANGED_ADDITIONAL_1
-            run_thread_priority_tests();
+        //    run_thread_priority_tests();
         #endif /* CHANGED_ADDITIONAL_1 */
         #endif /* CHANGED_1 */
         #ifdef CHANGED_3
         kwrite("Running kernel tests for phase 3...\n");
-        run_nic_tests();
+        //run_nic_tests();
         run_sfs_tests();
         #endif
     }

@@ -14,6 +14,11 @@
 #include "kernel/assert.h"
 #include "kernel/thread.h"
 
+lock_t *sync_lock_small;
+lock_t *sync_lock_large;
+
+cond_t *sync_cond_small;
+cond_t *sync_cond_large;
 
 
 static void test_create() {
@@ -86,12 +91,61 @@ static void test_read_write() {
     kprintf("OK!\nSFS read/write tests OK!\n");
 }
 
+static void sync_read_small(uint32_t dummy){
+    dummy = dummy;
+    int size = 16;
+    char buffer[size];
+    openfile_t f = vfs_open("[disk1]/tests/bigfile.txt");
+    kprintf("small f: %d", f);
+    lock_acquire(sync_lock_small);
+    kprintf("SMALL GOING TO COND\n");
+    condition_wait(sync_cond_small, sync_lock_small);
+    vfs_read(f, buffer, size);
+    lock_release(sync_lock_small);
+    kprintf("SMALL FINISHED\n");
+}
+
+static void sync_read_large(uint32_t dummy){
+    dummy = dummy;
+    int size = 2000;
+    char buffer[size];
+    openfile_t f = vfs_open("[disk1]/tests/bigfile.txt");
+    kprintf("large f: %d", f);
+    lock_acquire(sync_lock_large);
+    kprintf("LARGE GOING TO COND\n");
+    condition_wait(sync_cond_large, sync_lock_large);
+    vfs_read(f, buffer, size);
+    lock_release(sync_lock_large);
+    kprintf("LARGE FINISHED\n");
+}
+
+static void test_sync_read(){
+
+    sync_lock_large = lock_create();
+    sync_lock_small = lock_create();
+
+    sync_cond_large = condition_create();
+    sync_cond_small = condition_create();
+    /*tid2 should finish before tid*/
+    TID_t tid = thread_create(&sync_read_large, 0);
+    thread_run(tid);
+
+    TID_t tid2 = thread_create(&sync_read_small, 0);
+    thread_run(tid2);
+    thread_sleep(2000);
+    condition_broadcast(sync_cond_large, sync_lock_large);
+    condition_broadcast(sync_cond_small, sync_lock_small);
+
+}
+
+
 
 void run_sfs_tests() {
     kprintf("Running SFS filesystem tests...\n=============================\n");
     test_create();
     test_delete();
     test_read_write();
+    test_sync_read();
     kprintf("=============================\nSFS filesystem tests OK!\n");
 }
 

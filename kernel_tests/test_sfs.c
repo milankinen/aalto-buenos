@@ -92,7 +92,8 @@ static void test_read_write() {
     KERNEL_ASSERT(vfs_read(dir, dirbuffer, SFS_VBLOCK_SIZE) > 0);
     // 3 files / sub-folders
     int i, offset = 0;
-    KERNEL_ASSERT(*((uint32_t*)dirbuffer) == 3);
+    uint32_t *temp_buf = ((uint32_t*)dirbuffer);
+    KERNEL_ASSERT(temp_buf[0] == 3);
     for (i = 0 ; i < 3 ; i++) {
         char* str = dirbuffer + sizeof(uint32_t) + offset;
         KERNEL_ASSERT(stringcmp(str, "a") == 0 || stringcmp(str, "b") == 0 || stringcmp(str, "c/") == 0);

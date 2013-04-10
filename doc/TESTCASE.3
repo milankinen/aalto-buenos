@@ -1,47 +1,52 @@
-Phase 3 TESTCASE 
-=================== 
+Phase 3 TESTCASE
+===================
 Group 3
 Lauri Hartikka, 79956E
-Jaakko Hujanen, 78842N 
+Jaakko Hujanen, 78842N
 Matti Lankinen, 82105H
 
 
-Device Driver 
------------------------------------------- 
-Nic tests are implemented in the kernel level and found in kernel_tests/test_network.c There
-are two types of test environments: “single-buenos” and “inter-buenos”
-the first meaning all network communication is emulated using single buenos
-instance and the latter meaning two buenos instances must be started which
-then communicate with each other. All tests are based on the POP protocol. All
-yams instances are configured to use UDP.
+Device Driver
+------------------------------------------
+Nic tests are implemented in the kernel level and found in
+kernel_tests/test_network.c There are two types of test environments:
+“single-buenos” and “inter-buenos” the first meaning all network
+communication is emulated using single buenos instance and the latter
+meaning two buenos instances must be started which then communicate with
+each other. All tests are based on the POP protocol. All yams instances
+are configured to use UDP.
 
 Running “inter-buenos” tests
 
-Total of 4 terminals must be started to run the emulation test where two
-buenos communicates both having different mac addresses.  1. terminal:
-yamst -lu tty0.socket 2. terminal: yamst- lu tty1.socket 3. terminal: sh
-startnetwork2.sh 4. terminal: sh startnetwork1.sh
+Total of 4 terminals must be started to run the emulation test where
+two buenos communicates both having different mac addresses.
+1. terminal: yamst -lu tty0.socket
+2. terminal: yamst- lu tty1.socket
+3. terminal: sh startnetwork2.sh
+4. terminal: sh startnetwork1.sh
 
-The latter buenos sends packets to first buenos which verifies the correctness
-of the data.
+The latter buenos sends packets to first buenos which verifies the
+correctness of the data.
 
 
 Running “single-buenos” tests
 
 testkernel.sh
 
-The single buenos tests are all run in a single buenos instance but implement
-more complex test cases. The tests are run within all the other kernel tests
-when testkernel.sh is executed.
+The single buenos tests are all run in a single buenos instance but
+implement more complex test cases. The tests are run within all the
+other kernel tests when testkernel.sh is executed.
 
-test_nicIOArea(): Tests the hwaddr and frame_size functions. Panics if wrong
-MAC or MTU.
+test_nicIOArea():
+Tests the hwaddr and frame_size functions. Panics if wrong MAC or MTU.
 
-test_send_receive(): One thread sends packets and other thread reads the
-packets. All the packets must match or panic is thrown.
+test_send_receive():
+One thread sends packets and other thread reads the packets. All the
+packets must match or panic is thrown.
 
-test_multiple_send_receive(): Two threads sends and two thread receives
-packets simultaneously. All the packets must match or panic is thrown.
+test_multiple_send_receive():
+Two threads sends and two thread receives packets simultaneously. All
+the packets must match or panic is thrown.
 
 
 Filesystem Concurrency and Directories
@@ -49,28 +54,31 @@ Filesystem Concurrency and Directories
 Running all tests:
 sh testkernel.sh
 
-Test cases regarding the filesystem are found in kernel_tests/test_sfs.c The
-tests are run likewise along the other kernel tests when the testkernel.sh
-is executed. The following test sets are included.
+Test cases regarding the filesystem are found in kernel_tests/test_sfs.c
+The tests are run likewise along the other kernel tests when the
+testkernel.sh is executed. The following test sets are included.
 
-test_create and test_delete() : Testing the basic cases regarding file and
-directory creation/deletion. Checking that invalid files and folders can’t
-be created/deleted.
+test_create and test_delete() :
+Testing the basic cases regarding file and directory
+creation/deletion. Checking that invalid files and folders can’t be
+created/deleted.
 
-test_read_write(): Testing that the created directories contains the correct
-files. Testing that the write operation works correctly and it can’t be
-used to modify folders. Reading and writing to files in different folders
-to verify correct functionality.
+test_read_write():
+Testing that the created directories contains the correct files. Testing
+that the write operation works correctly and it can’t be used to
+modify folders. Reading and writing to files in different folders to
+verify correct functionality.
 
-test_basic_concurrent_read(): Testing the basic concurrency functionality. One
-big file is read simultaneously by two threads, however the latter thread
-only reads the first characters. The latter thread should finish before the
-first thread, that tries to read the whole file.
+test_basic_concurrent_read():
+Testing the basic concurrency functionality. One big file is read
+simultaneously by two threads, however the latter thread only reads the
+first characters. The latter thread should finish before the first thread,
+that tries to read the whole file.
 
-test_read_write_concurrency(): A more complex test case regarding the
-concurrency testing. 15 different threads are randomly spawn and they either
-read or write a specific big file. The verification of simultaneous behaviour
-must be done by looking at debug printings. The point of this test is to
-verity that there is only one writer or multiple readers at time to operate
-the file entry.
+test_read_write_concurrency():
+A more complex test case regarding the concurrency testing. 15 different
+threads are randomly spawn and they either read or write a specific big
+file. The verification of simultaneous behaviour must be done by looking
+at debug printings. The point of this test is to verity that there is
+only one writer or multiple readers at time to operate the file entry.
 

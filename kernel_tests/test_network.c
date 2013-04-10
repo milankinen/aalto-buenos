@@ -1,7 +1,7 @@
 /*
  * network.c
  */
-
+#ifdef CHANGED_3
 #include "net/socket.h"
 #include "net/pop.h"
 #include "kernel/assert.h"
@@ -149,3 +149,5 @@ void run_nic_tests() {
 
 
 }
+
+#endif

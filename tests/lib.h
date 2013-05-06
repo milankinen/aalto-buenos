@@ -39,6 +39,9 @@
 
 #include "lib/types.h"
 
+/* NULL pointer for userland programs */
+#define NULL ((void *)0)
+
 /* Filehandles for input and output */
 #define stdin 0
 #define stdout 1
@@ -69,6 +72,11 @@ int syscall_delete(const char *filename);
 
 int syscall_fork(void (*func)(int), int arg);
 void *syscall_memlimit(void *heap_end);
+
+#ifdef CHANGED_4
+void *malloc(int size);
+void free(void *ptr);
+#endif 
 
 
 #endif /* BUENOS_USERLAND_LIB_H */

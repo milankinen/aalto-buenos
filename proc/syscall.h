@@ -113,6 +113,10 @@ void syscall_handle_exit(int retval);
 
 int syscall_handle_join(PID_t pid);
 
+#ifdef CHANGED_4
+void * syscall_handle_memlimit(void *heap_end);
+#endif /*CHANGED_4*/
+
 openfile_t syscall_handle_open(const char *filename);
 
 int syscall_handle_close(openfile_t filehandle);

@@ -166,5 +166,12 @@ int syscall_handle_join(PID_t pid) {
     return retval;
 }
 
+#ifdef CHANGED_4
+void * syscall_handle_memlimit(void *heap_end) {
+    /* FIXME */
+    heap_end = heap_end;
+    return NULL;
+}
+#endif /*CHANGED_4*/
 
 #endif /* CHANGED_2 */

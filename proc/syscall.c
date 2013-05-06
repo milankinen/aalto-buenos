@@ -169,6 +169,13 @@ void syscall_handle(context_t *user_context) {
                 (uint32_t) syscall_handle_join(
                         (PID_t) user_context->cpu_regs[MIPS_REGISTER_A1]);
         break;
+#ifdef CHANGED_4
+    case SYSCALL_MEMLIMIT:
+        user_context->cpu_regs[MIPS_REGISTER_V0] =
+                (uint32_t)syscall_handle_memlimit(
+                        (void *) user_context->cpu_regs[MIPS_REGISTER_A1]);
+        break;
+#endif
     case SYSCALL_OPEN:
         return_value = syscall_handle_open(
                 (char*) user_context->cpu_regs[MIPS_REGISTER_A1]);

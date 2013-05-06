@@ -171,6 +171,15 @@ int syscall_handle_join(PID_t pid) {
 }
 
 #ifdef CHANGED_4
+/* outline for implementation:
+ *  current heap_end is calculated heap_start+offset
+ *  -> offset is held in a static variable
+ *     and heap_start is obtained from the process table
+ *  heap_end can be freely returned to be anything requested
+ *  if it is in the current page
+ *  -> mapping/unmapping pages is needed when the heap_end
+ *     is moved out of its page
+ */
 void * syscall_handle_memlimit(void *heap_end) {
     /* FIXME */
     heap_end = heap_end;

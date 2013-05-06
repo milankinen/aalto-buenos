@@ -179,6 +179,8 @@ int syscall_handle_join(PID_t pid) {
  *  if it is in the current page
  *  -> mapping/unmapping pages is needed when the heap_end
  *     is moved out of its page
+ *  note:
+ *      ensure heap does not reach stack
  */
 void * syscall_handle_memlimit(void *heap_end) {
     /* FIXME */

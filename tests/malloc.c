@@ -99,15 +99,39 @@ find_header(void *segment_start) {
     return (void *)((char *)segment_start - SEG_HEADER_SIZE);
 }
 
+/* merges free adjacent segments to the freed segment */
 static void
-merge_around(segment_header_t *freed_header) {
-    freed_header = freed_header;
+merge_around(segment_header_t *between) {
+    segment_header_t *next = between->next;
+    segment_header_t *prev = between->prev;
+    /* merge previous */
+    if (prev->free) {
+        next->prev = prev;
+        prev->next = next;
+        /* add length of the between segment to size of previous segment */
+        prev->size += between->size + SEG_HEADER_SIZE;
+        /* there is no between segment anymore
+         * --> let between be now previous segment to make next merge work
+         */
+        between = prev;
+    }
+    /* merge next */
+    if (next->free) {
+        /* add length of the next segment to size of
+         * between (or previous if above code was executed) segment
+         */
+        between->size += next->size + SEG_HEADER_SIZE;
+    }
 }
 
 static int
 last_free(segment_header_t *freed_header) {
-    freed_header = freed_header;
-    return 0;
+    while (freed_header->next) {
+        freed_header = freed_header->next;
+        if (!freed_header->free)
+            return 0;
+    }
+    return 1;
 }
 
 void *

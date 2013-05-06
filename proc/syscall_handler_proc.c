@@ -181,6 +181,8 @@ int syscall_handle_join(PID_t pid) {
  *     is moved out of its page
  *  note:
  *      ensure heap does not reach stack
+ *      -> process table has the information
+ *      FIXME: possibly preprocessor macro would be better?
  */
 void * syscall_handle_memlimit(void *heap_end) {
     /* FIXME */

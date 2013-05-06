@@ -73,10 +73,8 @@ int syscall_delete(const char *filename);
 int syscall_fork(void (*func)(int), int arg);
 void *syscall_memlimit(void *heap_end);
 
-#ifdef CHANGED_4
 void *malloc(int size);
 void free(void *ptr);
-#endif 
 
 
 #endif /* BUENOS_USERLAND_LIB_H */

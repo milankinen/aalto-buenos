@@ -58,6 +58,11 @@ typedef struct {
     /*references to open file handles */
     int filehandle[MAX_OPEN_FILES_PER_PROCESS];
 
+#ifdef CHANGED_4
+    /* starting address for the heap */
+    uint32_t heap_vaddr;
+#endif
+
 } process_table_t;
 
 

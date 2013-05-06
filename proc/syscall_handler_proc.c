@@ -16,6 +16,10 @@
 #include "kernel/thread.h"
 #include "proc/process_table.h"
 
+#ifdef CHANGED_4
+#include "drivers/yams.h"
+#endif
+
 
 extern lock_t* process_table_lock;
 extern process_table_t process_table[CONFIG_MAX_PROCESSES];

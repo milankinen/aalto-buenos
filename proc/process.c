@@ -346,6 +346,21 @@ void process_start(const char *executable, child_process_create_data_t* data)
         }
     }
 
+#ifdef CHANGED_4
+    /* heap is allocated one page above rw-segment and is left uninitialized */
+    my_proc_entry->heap_vaddr = elf.rw_vaddr + elf.rw_pages*PAGE_SIZE;
+    phys_page = pagepool_get_phys_page();
+    if(phys_page == 0) {
+        restore_process_state(data, my_proc_entry, 1, file);
+        return;
+    }
+    if (vm_map(my_entry->pagetable, phys_page,
+           elf.rw_vaddr + i*PAGE_SIZE, 1) < 0) {
+        restore_process_state(data, my_proc_entry, 1, file);
+        return;
+    }
+#endif /*CHANGED_4*/
+
     /* Put the mapped pages into TLB. Here we again assume that the
        pages fit into the TLB. After writing proper TLB exception
        handling this call should be skipped. */

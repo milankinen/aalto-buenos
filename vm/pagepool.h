@@ -47,4 +47,8 @@ void pagepool_init(void);
 uint32_t pagepool_get_phys_page(void);
 void pagepool_free_phys_page(uint32_t phys_addr);
 
+#ifdef CHANGED_4
+int pagepool_get_free_pages(void);
+#endif
+
 #endif /* BUENOS_VM_PAGEPOOL_H */

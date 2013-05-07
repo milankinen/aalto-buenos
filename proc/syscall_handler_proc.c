@@ -18,6 +18,7 @@
 
 #ifdef CHANGED_4
 #include "drivers/yams.h"
+#include "vm/pagetable.h"
 #define STACK_BOTTOM ((USERLAND_STACK_TOP & PAGE_SIZE_MASK) \
                      - (CONFIG_USERLAND_STACK_SIZE-1)*PAGE_SIZE)
 #endif
@@ -173,6 +174,49 @@ int syscall_handle_join(PID_t pid) {
 }
 
 #ifdef CHANGED_4
+/* check how many pages apart two virtual addresses are
+ * returns 0  if the addresses are on the same page
+ *         >0 if page of vaddr_old < page of vaddr_new
+ *         <0 if page of vaddr_old > page of vaddr_new
+ * note: this corresponds to computing vaddr_new-vaddr_old
+ */
+int page_diff(uint32_t vaddr_new, uint32_t vaddr_old) {
+    uint32_t page_new = vaddr_new & PAGE_SIZE_MASK;
+    uint32_t page_old = vaddr_old & PAGE_SIZE_MASK;
+    return (page_new-page_old)/PAGE_SIZE;
+}
+
+#ifndef ADDR_IS_ON_EVEN_PAGE
+#define ADDR_IS_ON_EVEN_PAGE(addr) (!((addr) & 0x00001000))
+#endif
+/* check if n pages can be mapped */
+int can_be_mapped(int n, uint32_t start_page_vaddr, pagetable_t *pagetable) {
+    int i, j, valid = (int)pagetable->valid_count;
+    uint32_t vaddr;
+    if (n > (PAGETABLE_ENTRIES - valid))
+        return 0;
+    /* check if some of these n pages is already mapped (error) */
+    for (j = 0; j < n; j++) {
+        for (i = 0; i<valid; i++) {
+            vaddr = start_page_vaddr + j*PAGE_SIZE;
+            if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+                if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
+                    if(pagetable->entries[i].V0 == 1) {
+                        /* already mapped */
+                        return 0;
+                    }
+                } else {
+                    if(pagetable->entries[i].V1 == 1) {
+                        /* already mapped */
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+    return 1;
+}
+
 /* outline for implementation:
  *  current heap_end is calculated heap_start+offset
  *  -> offset is held in a static variable
@@ -186,9 +230,56 @@ int syscall_handle_join(PID_t pid) {
  *      -> preprocessor macro has the stack bottom information
  */
 void * syscall_handle_memlimit(void *heap_end) {
-    /* FIXME */
-    heap_end = heap_end;
-    return NULL;
+    static uint32_t offset = 0;
+    int required_pages, i;
+
+    interrupt_status_t intr_status;
+    process_table_t *proc = get_current_process_entry();
+    thread_table_t *thread = thread_get_current_thread_entry();
+
+    uint32_t heap_new = (uint32_t)heap_end;
+    uint32_t heap_vaddr = proc->heap_vaddr;
+    uint32_t heap_now = heap_vaddr + offset;
+    uint32_t phys_page, page_now = heap_now & PAGE_SIZE_MASK;
+
+    if (heap_end) {
+        required_pages = page_diff(heap_new, heap_now);
+        /* check overlap and going behind heap start */
+        /* Note: mapping and  getting pages needs synchronization
+         *       we only have use interrupt disabling since
+         *       our virtual memory is only for uniprocessor systems
+         */
+        intr_status = _interrupt_disable();
+        if (heap_new >= STACK_BOTTOM || heap_new < heap_vaddr) {
+            _interrupt_set_state(intr_status);
+            return NULL;
+        } else if (required_pages > 0) {
+            /* map pages */
+            if ((required_pages > pagepool_get_free_pages())
+                    || can_be_mapped(required_pages,page_now,thread->pagetable)) {
+                _interrupt_set_state(intr_status);
+                return NULL;
+            }
+            for (i = 0; i < required_pages; i++) {
+                phys_page = pagepool_get_phys_page();
+                vm_map(thread->pagetable,phys_page,page_now+i*PAGE_SIZE,1);
+            }
+        } else if (required_pages < 0) {
+            /* unmap pages and TODO free phys_addr */
+            for (i = 0; i < -required_pages; i++) {
+                vm_unmap(thread->pagetable,page_now-i*PAGE_SIZE);
+            }
+        }
+        _interrupt_set_state(intr_status);
+        /* else required_pages == 0
+         * no need to manage pages
+         */
+        offset += (int)(heap_new - heap_now);
+        return (void *)heap_new;
+    } else {
+        /* heap_end == NULL */
+        return (void *)heap_now;
+    }
 }
 #endif /*CHANGED_4*/
 

@@ -7,4 +7,5 @@ main(void) {
     char *s = malloc(sizeof(char));
     free(s);
     syscall_halt();
+    return 0;
 }

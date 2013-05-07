@@ -37,14 +37,14 @@
 
 # Add your _userland_ program sources to this variable:
 SOURCES  := halt.c shell.c test_proc.c test_panic.c test_fs_syscall.c run_all_tests.c \
-			test_adventure.c write.c append.c cat.c touch.c ls.c malloc.c
+			test_adventure.c write.c append.c cat.c touch.c ls.c test_malloc.c
 
 OBJECTS  := $(patsubst %.c, %.o, $(SOURCES))
 TARGETS  := $(patsubst %.o, %, $(OBJECTS))
 
 # crt.o must be the first one and the $(SYSLIBS) must come first in
 # the pre-requisites list (or object files list).
-SYSLIBS := crt.o _syscall.o lib.o str.o
+SYSLIBS := crt.o _syscall.o lib.o str.o malloc.o
 
 # Compiler configuration
 CC      := mips-elf-gcc

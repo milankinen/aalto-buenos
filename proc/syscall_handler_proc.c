@@ -238,19 +238,18 @@ void * syscall_handle_memlimit(void *heap_end) {
     thread_table_t *thread = thread_get_current_thread_entry();
 
     uint32_t heap_new = (uint32_t)heap_end;
-    uint32_t heap_vaddr = proc->heap_vaddr;
-    uint32_t heap_now = heap_vaddr + offset;
+    uint32_t heap_now = proc->heap_vaddr + offset;
     uint32_t phys_page, page_now = heap_now & PAGE_SIZE_MASK;
 
     if (heap_end) {
         required_pages = page_diff(heap_new, heap_now);
-        /* check overlap and going behind heap start */
-        /* Note: mapping and  getting pages needs synchronization
+        /* check overlap and going behind heap start
+         * Note: mapping and  getting pages needs synchronization
          *       we only have use interrupt disabling since
          *       our virtual memory is only for uniprocessor systems
          */
         intr_status = _interrupt_disable();
-        if (heap_new >= STACK_BOTTOM || heap_new < heap_vaddr) {
+        if (heap_new >= STACK_BOTTOM || heap_new < proc->heap_vaddr) {
             _interrupt_set_state(intr_status);
             return NULL;
         } else if (required_pages > 0) {
@@ -265,7 +264,7 @@ void * syscall_handle_memlimit(void *heap_end) {
                 vm_map(thread->pagetable,phys_page,page_now+i*PAGE_SIZE,1);
             }
         } else if (required_pages < 0) {
-            /* unmap pages and TODO free phys_addr */
+            /* unmap */
             for (i = 0; i < -required_pages; i++) {
                 vm_unmap(thread->pagetable,page_now-i*PAGE_SIZE);
             }

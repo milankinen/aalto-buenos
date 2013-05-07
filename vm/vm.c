@@ -288,10 +288,17 @@ int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
 
 void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
 {
-    pagetable = pagetable;
-    vaddr     = vaddr;
-    
-    /* Not implemented */
+    uint32_t i;
+    if (!pagetable) return;
+    for (i = 0; i < pagetable->valid_count; i++) {
+        if (pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+            if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
+                pagetable->entries[i].V0 = 0;
+            } else {
+                pagetable->entries[i].V1 = 0;
+            }
+        }
+    }
 }
 
 /**

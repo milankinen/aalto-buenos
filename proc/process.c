@@ -348,14 +348,21 @@ void process_start(const char *executable, child_process_create_data_t* data)
 
 #ifdef CHANGED_4
     /* heap is allocated one page above rw-segment and is left uninitialized */
+    intr_status =_interrupt_disable();
+    lock_acquire(process_table_lock);
+
     my_proc_entry->heap_vaddr = elf.rw_vaddr + elf.rw_pages*PAGE_SIZE;
+
+    lock_release(process_table_lock);
+    _interrupt_set_state(intr_status);
+
     phys_page = pagepool_get_phys_page();
     if(phys_page == 0) {
         restore_process_state(data, my_proc_entry, 1, file);
         return;
     }
     if (vm_map(my_entry->pagetable, phys_page,
-           elf.rw_vaddr + i*PAGE_SIZE, 1) < 0) {
+           my_proc_entry->heap_vaddr, 1) < 0) {
         restore_process_state(data, my_proc_entry, 1, file);
         return;
     }

@@ -61,8 +61,6 @@ typedef struct {
 #ifdef CHANGED_4
     /* starting address for the heap */
     uint32_t heap_vaddr;
-    /* stack bottom */
-    uint32_t stack_bottom;
 #endif
 
 } process_table_t;

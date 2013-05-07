@@ -378,10 +378,6 @@ void process_start(const char *executable, child_process_create_data_t* data)
         (CONFIG_USERLAND_STACK_SIZE-1)*PAGE_SIZE;
     memoryset((void *)stack_bottom, 0, CONFIG_USERLAND_STACK_SIZE*PAGE_SIZE);
 
-#ifdef CHANGED_4
-    my_proc_entry->stack_bottom = stack_bottom;
-#endif
-
     /* Copy segments */
 
     if (elf.ro_size > 0) {

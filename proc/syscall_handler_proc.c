@@ -18,6 +18,8 @@
 
 #ifdef CHANGED_4
 #include "drivers/yams.h"
+#define STACK_BOTTOM ((USERLAND_STACK_TOP & PAGE_SIZE_MASK) \
+                     - (CONFIG_USERLAND_STACK_SIZE-1)*PAGE_SIZE)
 #endif
 
 
@@ -181,8 +183,7 @@ int syscall_handle_join(PID_t pid) {
  *     is moved out of its page
  *  note:
  *      ensure heap does not reach stack
- *      -> process table has the information
- *      FIXME: possibly preprocessor macro would be better?
+ *      -> preprocessor macro has the stack bottom information
  */
 void * syscall_handle_memlimit(void *heap_end) {
     /* FIXME */

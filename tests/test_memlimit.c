@@ -22,6 +22,14 @@ main(void) {
         return 1;
     } else cout("OK.\n");
 
+    cout("-> getting current heap: ");
+    heap = syscall_memlimit(0);
+    if (heap == orig) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
     cout("-> memlimit with maximum address: ");
     heap = syscall_memlimit((void *)((uint32_t)(-1)));
     if (heap) {
@@ -54,8 +62,24 @@ main(void) {
         return 1;
     }
 
+    cout("-> getting current heap: ");
+    heap = syscall_memlimit(0);
+    if (heap) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
     cout("-> memlimit with plus three page difference: ");
     heap = syscall_memlimit(heap + 3*4096);
+    if (heap) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
+    cout("-> getting current heap: ");
+    heap = syscall_memlimit(0);
     if (heap) cout("OK.\n");
     else {
         cout("FAIL!\n");

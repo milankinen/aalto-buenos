@@ -76,6 +76,15 @@ static void free_process_table_entry(process_table_t* entry) {
     init_process_filehandle(entry);
 }
 
+#ifdef CHANGED_4
+/* this must be called with free_process_table_entry if heap is wanted to
+ * be freed e.g. in initialization function this is not required
+ */
+static void free_process_heap(process_table_t *proc, pagetable_t *pagetable) {
+    vm_unmap(pagetable, proc->heap_vaddr);
+}
+#endif
+
 void process_table_init() {
     size_t i;
     interrupt_status_t stat;
@@ -131,6 +140,9 @@ static void restore_process_state(child_process_create_data_t* data, process_tab
         intr_stat = _interrupt_disable();
         // process table entry has been created, we must free it
         free_process_table_entry(entry);
+#ifdef CHANGED_4
+        free_process_heap(entry,thread_entry->pagetable);
+#endif
         if (thread_entry != NULL) {
             thread_entry->userland_pid = -1;
         }

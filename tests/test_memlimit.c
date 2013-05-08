@@ -79,5 +79,6 @@ main(void) {
         return 1;
     }
 
+    cout("All memlimit tests passed.\n");
     return 0;
 }

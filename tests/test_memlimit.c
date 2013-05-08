@@ -3,12 +3,12 @@
 
 int
 main(void) {
-    char *heap;
+    char *heap, *orig;
 
     cout("Testing memlimit.\n");
 
     cout("-> getting current heap: ");
-    heap = syscall_memlimit(0);
+    heap = orig = syscall_memlimit(0);
     if (heap) cout("OK.\n");
     else {
         cout("FAIL!\n");
@@ -38,8 +38,25 @@ main(void) {
         return 1;
     }
 
-    cout("-> memlimit with over one page difference: ");
+    cout("-> memlimit with plus one page difference: ");
     heap = syscall_memlimit(heap + 4096);
+    if (heap) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
+    cout("-> memlimit with minus one page difference: ");
+    heap = syscall_memlimit(heap - 4096);
+    if (heap) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
+    cout("-> memlimit set original heap start: ");
+    heap = syscall_memlimit(0);
+    heap = syscall_memlimit(orig);
     if (heap) cout("OK.\n");
     else {
         cout("FAIL!\n");

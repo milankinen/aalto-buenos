@@ -183,7 +183,7 @@ int syscall_handle_join(PID_t pid) {
 int page_diff(uint32_t vaddr_new, uint32_t vaddr_old) {
     uint32_t page_new = vaddr_new & PAGE_SIZE_MASK;
     uint32_t page_old = vaddr_old & PAGE_SIZE_MASK;
-    return (page_new-page_old)/PAGE_SIZE;
+    return ((int)(page_new-page_old))/PAGE_SIZE;
 }
 
 #ifndef ADDR_IS_ON_EVEN_PAGE
@@ -243,6 +243,7 @@ void * syscall_handle_memlimit(void *heap_end) {
 
     if (heap_end) {
         required_pages = page_diff(heap_new, heap_now);
+        kprintf("\nreq pages = %d\n",required_pages);
         /* check overlap and going behind heap start
          * Note: mapping and  getting pages needs synchronization
          *       we only have use interrupt disabling since

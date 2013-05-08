@@ -54,6 +54,22 @@ main(void) {
         return 1;
     }
 
+    cout("-> memlimit with plus three page difference: ");
+    heap = syscall_memlimit(heap + 3*4096);
+    if (heap) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
+    cout("-> memlimit with minus three page difference: ");
+    heap = syscall_memlimit(heap - 3*4096);
+    if (heap) cout("OK.\n");
+    else {
+        cout("FAIL!\n");
+        return 1;
+    }
+
     cout("-> memlimit set original heap start: ");
     heap = syscall_memlimit(0);
     heap = syscall_memlimit(orig);

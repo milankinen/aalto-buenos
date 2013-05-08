@@ -273,11 +273,11 @@ void * syscall_handle_memlimit(void *heap_end) {
                 vm_unmap(thread->pagetable,page_now-i*PAGE_SIZE);
             }
         }
-        _interrupt_set_state(intr_status);
         /* else required_pages == 0
          * no need to manage pages
          */
         offset += (int)(heap_new - heap_now);
+        _interrupt_set_state(intr_status);
         return (void *)heap_new;
     } else {
         /* heap_end == NULL */

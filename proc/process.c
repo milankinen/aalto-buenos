@@ -73,15 +73,19 @@ static void free_process_table_entry(process_table_t* entry) {
     entry->next               = PROCESS_NO_PARENT_PID;
     entry->last_child_pid     = PROCESS_NO_PARENT_PID;
     entry->retval             = PROCESS_NO_RETVAL;
+#ifdef CHANGED_4
+    entry->heap_vaddr         = 0;
+#endif
     init_process_filehandle(entry);
 }
 
 #ifdef CHANGED_4
-/* this must be called with free_process_table_entry if heap is wanted to
+/* this must be called before free_process_table_entry if heap is wanted to
  * be freed e.g. in initialization function this is not required
  */
 static void free_process_heap(process_table_t *proc, pagetable_t *pagetable) {
-    vm_unmap(pagetable, proc->heap_vaddr);
+    if (proc->heap_vaddr)
+        vm_unmap(pagetable, proc->heap_vaddr);
 }
 #endif
 
@@ -139,10 +143,10 @@ static void restore_process_state(child_process_create_data_t* data, process_tab
     if (entry != NULL) {
         intr_stat = _interrupt_disable();
         // process table entry has been created, we must free it
-        free_process_table_entry(entry);
 #ifdef CHANGED_4
         free_process_heap(entry,thread_entry->pagetable);
 #endif
+        free_process_table_entry(entry);
         if (thread_entry != NULL) {
             thread_entry->userland_pid = -1;
         }

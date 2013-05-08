@@ -294,17 +294,17 @@ void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
 {
 #ifdef CHANGED_4
     uint32_t i;
-    tlb_entry_t entry;
+    tlb_entry_t *entry;
     if (!pagetable) return;
     for (i = 0; i < pagetable->valid_count; i++) {
-        entry = pagetable->entries[i];
-        if (entry.VPN2 == (vaddr >> 13)) {
+        entry = &pagetable->entries[i];
+        if (entry->VPN2 == (vaddr >> 13)) {
             if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-                pagepool_free_phys_page(entry.PFN0 << 12);
-                entry.V0 = 0;
+                pagepool_free_phys_page(entry->PFN0 << 12);
+                entry->V0 = 0;
             } else {
-                pagepool_free_phys_page(entry.PFN1 << 12);
-                entry.V1 = 0;
+                pagepool_free_phys_page(entry->PFN1 << 12);
+                entry->V1 = 0;
             }
         }
     }

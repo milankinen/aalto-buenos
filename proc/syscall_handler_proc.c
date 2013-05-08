@@ -243,7 +243,6 @@ void * syscall_handle_memlimit(void *heap_end) {
 
     if (heap_end) {
         required_pages = page_diff(heap_new, heap_now);
-        kprintf("\nreq pages = %d\n",required_pages);
         /* check overlap and going behind heap start
          * Note: mapping and  getting pages needs synchronization
          *       we only have use interrupt disabling since

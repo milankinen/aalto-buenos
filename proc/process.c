@@ -442,7 +442,6 @@ void process_start(const char *executable, child_process_create_data_t* data)
             return;
         }
     }
-    _interrupt_set_state(intr_status);
 
     /* Set the dirty bit to zero (read-only) on read-only pages. */
     for(i = 0; i < (int)elf.ro_pages; i++) {

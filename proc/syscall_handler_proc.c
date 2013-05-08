@@ -102,6 +102,10 @@ void syscall_handle_exit(int retval) {
         intr_stat = _interrupt_disable();
         lock_acquire(my_entry->die_lock);
         lock_acquire(process_table_lock);
+#ifdef CHANGED_4
+        /* free heap */
+        vm_unmap(my_thread->pagetable,my_entry->heap_vaddr);
+#endif
         child_pid = my_entry->last_child_pid;
         // set all child processes to ophrans (if child process is alreay zombie then
         // it is freed totally and is ready for new execution)
@@ -259,7 +263,7 @@ void * syscall_handle_memlimit(void *heap_end) {
                 _interrupt_set_state(intr_status);
                 return NULL;
             }
-            for (i = 0; i < required_pages; i++) {
+            for (i = 1; i <= required_pages; i++) {
                 phys_page = pagepool_get_phys_page();
                 vm_map(thread->pagetable,phys_page,page_now+i*PAGE_SIZE,1);
             }

@@ -238,6 +238,8 @@ void * syscall_handle_memlimit(void *heap_end) {
     int required_pages, i;
 
     interrupt_status_t intr_status;
+    intr_status = _interrupt_disable();
+
     process_table_t *proc = get_current_process_entry();
     thread_table_t *thread = thread_get_current_thread_entry();
 
@@ -252,7 +254,6 @@ void * syscall_handle_memlimit(void *heap_end) {
          *       we only have use interrupt disabling since
          *       our virtual memory is only for uniprocessor systems
          */
-        intr_status = _interrupt_disable();
         if (heap_new >= STACK_BOTTOM || heap_new < proc->heap_vaddr) {
             _interrupt_set_state(intr_status);
             return NULL;
@@ -281,6 +282,7 @@ void * syscall_handle_memlimit(void *heap_end) {
         return (void *)heap_new;
     } else {
         /* heap_end == NULL */
+        _interrupt_set_state(intr_status);
         return (void *)heap_now;
     }
 }

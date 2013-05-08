@@ -3,9 +3,9 @@
 
 int
 main(void) {
-    cout("Running malloc tests.\n");
+    cout("Running malloc tests: ");
     char *s = malloc(sizeof(char));
     free(s);
-    syscall_halt();
+    cout("OK.\n");
     return 0;
 }

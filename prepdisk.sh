@@ -24,4 +24,5 @@ util/tfstool write store.file tests/bigfile.txt bigfile.txt
 
 # util/tfstool write store.file tests/run_all_tests run_all_tests
 
-
+util/tfstool write store.file tests/test_malloc test_malloc
+util/tfstool write store.file tests/test_memlimit test_memlimit

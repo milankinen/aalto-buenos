@@ -56,7 +56,8 @@ next_free(segment_header_t *start, int size) {
          * get more heap
          */
         heap_end = syscall_memlimit(NULL);
-        new_heap_end = syscall_memlimit((char *)heap_end + size + SEG_HEADER_SIZE);
+        new_heap_end = syscall_memlimit((char *)heap_end + 1 + size + SEG_HEADER_SIZE);
+        /* +1 since heap_end is addressible */
         if (!new_heap_end)
             return NULL;
         /* update the last header */
@@ -65,6 +66,7 @@ next_free(segment_header_t *start, int size) {
         last_seg = (segment_header_t *)(heap_end+1);
         seg->next = last_seg;
         last_seg->prev = seg;
+        last_seg->next = NULL;
         seg = last_seg;
     }
     return seg;
@@ -75,11 +77,12 @@ divide_segment(segment_header_t *seg, int size) {
     segment_header_t *between;
     if (seg->next) {
         /* create a new seg after size bytes */
-        between = (segment_header_t *)(seg + size + SEG_HEADER_SIZE);
+        between = (segment_header_t *)((char *)seg + size + SEG_HEADER_SIZE);
         between->next = seg->next;
         between->prev = seg;
         between->size = seg->size - size - SEG_HEADER_SIZE;
 
+        seg->next->prev = between;
         seg->next = between;
         seg->size = size;
     } else {
@@ -111,7 +114,7 @@ merge_around(segment_header_t *between) {
         /* add length of the between segment to size of previous segment */
         prev->size += between->size + SEG_HEADER_SIZE;
         /* there is no between segment anymore
-         * --> let between be now previous segment to make next merge work
+         * --> let between be now previous segment to make next if clause work
          */
         between = prev;
     }
@@ -121,6 +124,9 @@ merge_around(segment_header_t *between) {
          * between (or previous if above code was executed) segment
          */
         between->size += next->size + SEG_HEADER_SIZE;
+        /* and update the linked list */
+        between->next = next->next;
+        next->next->prev = between;
     }
 }
 

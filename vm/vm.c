@@ -281,6 +281,28 @@ int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
 }
 #endif
 
+
+#ifdef CHANGED_4
+
+tlb_entry_t* vm_get_entry_by_vaddr(pagetable_t *pagetable, uint32_t vaddr) {
+    uint32_t i;
+
+    if (vaddr < 0x00001000) {
+        // no vaddresses allowed < 4096 (=tlb page size)
+        return NULL;
+    }
+    if (pagetable) {
+        for(i = 0 ; i < pagetable->valid_count ; i++) {
+            if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+                return pagetable->entries + i;
+            }
+        }
+    }
+    return NULL;
+}
+
+#endif /* CHANGED_4 */
+
 /**
  * Unmaps given virtual address from given pagetable.
  *

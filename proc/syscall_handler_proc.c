@@ -19,6 +19,7 @@
 #ifdef CHANGED_4
 #include "drivers/yams.h"
 #include "vm/pagetable.h"
+#include "vm/tlb.h"
 #define STACK_BOTTOM ((USERLAND_STACK_TOP & PAGE_SIZE_MASK) \
                      - (CONFIG_USERLAND_STACK_SIZE-1)*PAGE_SIZE)
 #endif
@@ -119,6 +120,7 @@ void syscall_handle_exit(int retval) {
         // signal joining parent (if any)
         condition_broadcast(my_entry->die_cond, my_entry->die_lock);
 
+
         // release page table
         for (i = 0 ; i < my_thread->pagetable->valid_count ; i++) {
             if (my_thread->pagetable->entries[i].V0) {
@@ -128,6 +130,15 @@ void syscall_handle_exit(int retval) {
                 pagepool_free_phys_page(my_thread->pagetable->entries[i].PFN1 << 12);
             }
         }
+
+#ifdef CHANGED_4
+        // invalidate TLB entries if they exist
+        for (i = 0 ; i < my_thread->pagetable->valid_count ; i++) {
+            my_thread->pagetable->entries[i].V0 = my_thread->pagetable->entries[i].V1 = 0;
+            tlb_replace_entry_if_exists(my_thread->pagetable->entries + i, my_thread->pagetable->entries + i);
+        }
+#endif
+
         vm_destroy_pagetable(my_thread->pagetable);
         my_thread->pagetable = NULL;
         my_thread->userland_pid = -1;

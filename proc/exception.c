@@ -76,16 +76,28 @@ void user_exception_handle(int exception)
 #ifdef CHANGED_2
     switch(exception) {
     case EXCEPTION_TLBM:
+#ifdef CHANGED_4
+        tlb_modified_exception();
+#else
 	syscall_handle_exit(PROCESS_EXIT_STATUS_EXCEPTION_TLBM);
 	//KERNEL_PANIC("TLB Modification: not handled yet");
+#endif /* CHANGED_4 */
 	break;
     case EXCEPTION_TLBL:
+#ifdef CHANGED_4
+        tlb_load_exception();
+#else
     syscall_handle_exit(PROCESS_EXIT_STATUS_EXCEPTION_TLBL);
 	//KERNEL_PANIC("TLB Load: not handled yet");
+#endif /* CHANGED_4 */
 	break;
     case EXCEPTION_TLBS:
+#ifdef CHANGED_4
+        tlb_store_exception();
+#else
     syscall_handle_exit(PROCESS_EXIT_STATUS_EXCEPTION_TLBS);
 	//KERNEL_PANIC("TLB Store: not handled yet");
+#endif /* CHANGED_4 */
 	break;
     case EXCEPTION_ADDRL:
     syscall_handle_exit(PROCESS_EXIT_STATUS_EXCEPTION_ADDRL);

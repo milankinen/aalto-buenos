@@ -80,4 +80,13 @@ int vm_get_vaddr_page_offsets(pagetable_t *pagetable, uint32_t vaddr,
 
 #endif /* CHANGED_2 */
 
+#ifdef CHANGED_4
+/**
+ * Returns TLB entry which contains given virtual address. Returns NULL if no TLB entry contains
+ * given vaddr.
+ *
+ */
+tlb_entry_t* vm_get_entry_by_vaddr(pagetable_t *pagetable, uint32_t vaddr);
+#endif /* CHANGED_4 */
+
 #endif /* BUENOS_VM_VM_H */

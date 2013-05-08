@@ -81,16 +81,28 @@ void kernel_exception_handle(int exception)
 
     switch(exception) {
     case EXCEPTION_TLBM:
+#ifdef CHANGED_4
+        tlb_modified_exception();
+#else
         print_tlb_debug();
 	KERNEL_PANIC("TLB Modification: not handled yet");
+#endif /* CHANGED_4 */
 	break;
     case EXCEPTION_TLBL:
+#ifdef CHANGED_4
+        tlb_load_exception();
+#else
         print_tlb_debug();
 	KERNEL_PANIC("TLB Load: not handled yet");
+#endif /* CHANGED_4 */
 	break;
     case EXCEPTION_TLBS:
+#ifdef CHANGED_4
+        tlb_store_exception();
+#else
         print_tlb_debug();
 	KERNEL_PANIC("TLB Store: not handled yet");
+#endif /* CHANGED_4 */
 	break;
     case EXCEPTION_ADDRL:
 	print_tlb_debug();

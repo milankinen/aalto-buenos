@@ -39,6 +39,92 @@
 #include "vm/tlb.h"
 #include "vm/pagetable.h"
 
+#ifdef CHANGED_4
+#   include "kernel/interrupt.h"
+#   include "vm/vm.h"
+#   include "kernel/thread.h"
+#   include "proc/syscall.h"
+#endif
+
+
+#ifdef CHANGED_4
+
+#ifndef ADDR_IS_ON_EVEN_PAGE
+#define ADDR_IS_ON_EVEN_PAGE(addr) (!((addr) & 0x00001000))
+#endif
+
+static void kill() {
+    kprintf("KILL!\n");
+    if (thread_get_current_thread_entry()->pagetable != NULL) {
+        // process
+        syscall_handle_exit(PROCESS_EXIT_STATUS_EXCEPTION_TLBS);
+    } else {
+        // kernel thread (wtf, is this possible??)
+        thread_finish();
+    }
+}
+
+static int try_to_fill(int check_dirty) {
+    pagetable_t* pagetable;
+    tlb_entry_t* entry;
+    tlb_exception_state_t state;
+    _tlb_get_exception_state(&state);
+
+    pagetable = thread_get_current_thread_entry()->pagetable;
+    KERNEL_ASSERT(pagetable != NULL);
+
+    // get tlb entry for bad address
+    entry = vm_get_entry_by_vaddr(pagetable, state.badvaddr);
+    if (entry != NULL ) {
+        // there is entry already, check that it has D-bit on
+        if (ADDR_IS_ON_EVEN_PAGE(state.badvaddr)) {
+            if (entry->V0 == 1 && (!check_dirty || entry->D0 == 1)) {
+                // address is inside active page that has D-bit enabled
+                // --> we can fill proper entry to TLB and try again
+                _tlb_write_random(entry);
+                _tlb_set_asid(pagetable->ASID);
+                return 1;
+            }
+        } else {
+            if (entry->V1 == 1 && (!check_dirty || entry->D1 == 1)) {
+                // address is inside active page that has D-bit enabled
+                // --> we can fill proper entry to TLB and try again
+                _tlb_write_random(entry);
+                _tlb_set_asid(pagetable->ASID);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+void tlb_modified_exception(void)
+{
+    // nothing to do
+    //kprintf("MODIFIED\n");
+    kill();
+}
+
+void tlb_load_exception(void)
+{
+    //kprintf("LOAD\n");
+    if (!try_to_fill(0)) {
+        // there is no way to correct TLB --> terminate thread / exit process
+        kill();
+    }
+}
+
+void tlb_store_exception(void)
+{
+    //kprintf("STORE\n");
+    if (!try_to_fill(1)) {
+        // there is no way to correct TLB --> terminate thread / exit process
+        kill();
+    }
+}
+
+#else
+
 void tlb_modified_exception(void)
 {
     KERNEL_PANIC("Unhandled TLB modified exception");
@@ -53,6 +139,8 @@ void tlb_store_exception(void)
 {
     KERNEL_PANIC("Unhandled TLB store exception");
 }
+
+#endif /* CHANGED_4 */
 
 /**
  * Fill TLB with given pagetable. This function is used to set memory
@@ -80,3 +168,34 @@ void tlb_fill(pagetable_t *pagetable)
        the TLB hardware. */
     _tlb_set_asid(pagetable->ASID);
 }
+
+
+#ifdef CHANGED_4
+
+void tlb_replace_entry_if_exists(tlb_entry_t* old, tlb_entry_t* new) {
+    int index;
+    interrupt_status_t st;
+
+    st = _interrupt_disable();
+    index = _tlb_probe(old);
+    if (index >= 0) {
+        // tlb entry found, replace it
+        _tlb_write(new, index, 1);
+    }
+    _interrupt_set_state(st);
+}
+
+void tlb_write_if_not_exists(tlb_entry_t* entry) {
+    int index;
+    interrupt_status_t st;
+
+    st = _interrupt_disable();
+    index = _tlb_probe(entry);
+    if (index < 0) {
+        // write new entry using random policy
+        _tlb_write_random(entry);
+    }
+    _interrupt_set_state(st);
+}
+
+#endif /* CHANGED_4 */

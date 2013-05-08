@@ -110,4 +110,18 @@ int _tlb_write(tlb_entry_t *entries, uint32_t index, uint32_t num);
 void _tlb_write_random(tlb_entry_t *entry);
 
 
+#ifdef CHANGED_4
+
+/**
+ * Replaces given entry with new content.
+ */
+void tlb_replace_entry_if_exists(tlb_entry_t* old, tlb_entry_t* new);
+
+/**
+ * Writes new entry into TLB if it doesn't exist already.
+ */
+void tlb_write_if_not_exists(tlb_entry_t* entry);
+
+#endif /* CHANGED_4 */
+
 #endif /* BUENOS_VM_TLB_H */

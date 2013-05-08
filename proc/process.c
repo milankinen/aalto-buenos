@@ -384,14 +384,22 @@ void process_start(const char *executable, child_process_create_data_t* data)
     }
 #endif /*CHANGED_4*/
 
+#ifndef CHANGED_4
+    // we don't want to fill tlb here, we fill it when exceptions occur
+    // writing operations below will raise exceptions so we fill them on-demand
+
     /* Put the mapped pages into TLB. Here we again assume that the
        pages fit into the TLB. After writing proper TLB exception
        handling this call should be skipped. */
     intr_status = _interrupt_disable();
     tlb_fill(my_entry->pagetable);
     _interrupt_set_state(intr_status);
-
     /* Now we may use the virtual addresses of the segments. */
+#else
+    intr_status = _interrupt_disable();
+    _tlb_set_asid(pagetable->ASID);
+    _interrupt_set_state(intr_status);
+#endif /*CHANGED_4*/
 
     /* Zero the pages. */
     memoryset((void *)elf.ro_vaddr, 0, elf.ro_pages*PAGE_SIZE);
@@ -434,17 +442,34 @@ void process_start(const char *executable, child_process_create_data_t* data)
             return;
         }
     }
-
+    _interrupt_set_state(intr_status);
 
     /* Set the dirty bit to zero (read-only) on read-only pages. */
     for(i = 0; i < (int)elf.ro_pages; i++) {
         vm_set_dirty(my_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 0);
     }
 
+#ifdef CHANGED_4
+
+    // because we set D-bits to 0, we must update possible TLB entries so
+    // that processses can't modify read-only pages
+    for(i = 0; i < (int)elf.ro_pages; i++) {
+        tlb_entry_t* ro_entry = vm_get_entry_by_vaddr(my_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE);
+        KERNEL_ASSERT(ro_entry != NULL);
+        // only D-bit is changed, so we can search for current entry
+        tlb_replace_entry_if_exists(ro_entry, ro_entry);
+    }
+    // ensure that ASID is set correctly
+    intr_status = _interrupt_disable();
+    _tlb_set_asid(my_entry->pagetable->ASID);
+    _interrupt_set_state(intr_status);
+
+#else
     /* Insert page mappings again to TLB to take read-only bits into use */
     intr_status = _interrupt_disable();
     tlb_fill(my_entry->pagetable);
     _interrupt_set_state(intr_status);
+#endif /* CHANGED_4 */
 
     /* Initialize the user context. (Status register is handled by
        thread_goto_userland) */

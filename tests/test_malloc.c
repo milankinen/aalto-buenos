@@ -70,5 +70,6 @@ main(void) {
     if (s) cout("Fail!\n");
     else cout("OK.\n");
 
+    syscall_halt();
     return 0;
 }

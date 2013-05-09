@@ -104,5 +104,7 @@ main(void) {
     }
 
     cout("All memlimit tests passed.\n");
+
+    syscall_halt();
     return 0;
 }

@@ -79,7 +79,7 @@ static void run_suites() {
     char* argv[1];
 
     for (i = 0 ; i < test_num ; i++) {
-       snprintf(filename, 30, "[disk1]%s", tests[i][0]);
+       snprintf(filename, 30, "[disk1]/%s", tests[i][0]);
        for (j = 0 ; j < cases[i] ; j++) {
            argv[0] = tests[i][j+1];
            cout("Running test %s [%s]\n", filename, argv[0]);

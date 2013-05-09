@@ -4,6 +4,9 @@
 
 #include "tests/lib.h"
 
+/* memory alignment = 4 bytes */
+#define ALIGNMENT 4
+
 /* each memory segment allocated by malloc has a header
  * - last header has next NULL
  */
@@ -25,13 +28,38 @@ static void
 init_malloc(void) {
     static int done = 0;
     if (done) return;
-    done = 1;
     heap.start = syscall_memlimit(NULL);
+    /* check memory alignment and allocate memory
+     * for the members of heap.start
+     */
+    if ((uint32_t)heap.start % ALIGNMENT) {
+        /* alignment */
+        heap.start = syscall_memlimit((char *)heap.start
+                                        + (ALIGNMENT - ((uint32_t)heap.start % ALIGNMENT)));
+    }
+    /* memory */
+    syscall_memlimit((char *)heap.start + SEG_HEADER_SIZE);
+
     heap.start->next = NULL;
     heap.start->prev = NULL;
     heap.start->size = 0;
     heap.start->free = 1;
+
+    done = 1;
     return;
+}
+
+/* adjust size to be aligned in memory
+ * returns negative value if size is bad
+ */
+int
+adjust_size(int *size) {
+    if (*size <= 0) return -1;
+    /* if size is not divisible by four,
+     * add the remainder
+     */
+    if (*size % ALIGNMENT) *size += ALIGNMENT - (*size % ALIGNMENT);
+    return 0;
 }
 
 /* returns free segment of size size for allocation
@@ -151,7 +179,7 @@ malloc(int size) {
 
     init_malloc();
 
-    if (size <= 0) return NULL;
+    if (adjust_size(&size) < 0) return NULL;
 
     seg = next_free(heap.start, size);
     if (!seg) return NULL;

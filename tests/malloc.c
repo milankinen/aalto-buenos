@@ -60,11 +60,16 @@ next_free(segment_header_t *start, int size) {
         /* +1 since heap_end is addressible */
         if (!new_heap_end)
             return NULL;
-        /* update the last header */
+        /* update the last header:
+         * we consider the start of the new segment as a pointer
+         * to the header structure
+         */
         /* +1 since the address heap_end is used by the previously
-         * last last_segment */
-        last_seg = (segment_header_t *)(heap_end+1);
+         * last last_segment
+         */
+        last_seg = (segment_header_t *)((char *)heap_end+1);
         seg->next = last_seg;
+        /* FIXME: the following line fails */
         last_seg->prev = seg;
         last_seg->next = NULL;
         seg = last_seg;

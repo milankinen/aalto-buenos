@@ -145,7 +145,7 @@ merge_around(segment_header_t *between) {
     segment_header_t *next = between->next;
     segment_header_t *prev = between->prev;
     /* merge previous */
-    if (prev->free) {
+    if (prev && prev->free) {
         next->prev = prev;
         prev->next = next;
         /* add length of the between segment to size of previous segment */
@@ -156,7 +156,7 @@ merge_around(segment_header_t *between) {
         between = prev;
     }
     /* merge next */
-    if (next->free) {
+    if (next && next->free) {
         /* add length of the next segment to size of
          * between (or previous if above code was executed) segment
          */

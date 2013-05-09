@@ -1,0 +1,47 @@
+Phase 3 TESTCASE
+=================
+Group 3
+Lauri Hartikka, 79956E
+Jaakko Hujanen, 78842N
+Matti Lankinen, 82105H
+
+Assignment 1
+--------------------
+The correct functionality of the TLB can be verified by running old tests.
+For instance
+>sh startprog.sh run_all_tests
+>sh startprog.sh shell
+launches the shell implemented in previous assignments.
+
+Note: all files and commands must start with / when using the shell
+since the addition of SFS.
+
+
+Assignment 3 - Malloc and Free
+----------------------------------------------
+Tests are in files:
+    tests/test_malloc.c
+    tests/test_memlimit.c.
+
+To run the tests compile userland programs and then in the project folder
+run command:
+
+    ./prepdisk.sh && ./startprog.sh test_memlimit
+
+or
+
+    ./prepdisk.sh && ./startprog.sh test_malloc
+
+Note: prepdisk.sh needs to be run only once since it only writes the
+userland programs to [disk1] of our buenos instance.
+
+Memlimit test tries to get current heap in multiple positions, allocate
+small amount of heap, free small amount of heap, allocate over one page,
+free over one page, allocate the whole memory, move heap lower than heap
+end and finally to return the heap to its original position. If output
+is OK then memlimit works as is expected.
+
+Malloc tests try to allocate and free different amounts of memory but
+unfortunately at current state any (proper) malloc call will just kill
+the process because of TLB store exception. Failing line is documented
+in the code as a FIXME comment (tests/malloc.c:105).

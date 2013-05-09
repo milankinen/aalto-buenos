@@ -17,7 +17,10 @@ typedef struct segment_header_s {
     uint32_t free;
 } segment_header_t;
 
-#define SEG_HEADER_SIZE (sizeof(segment_header_t))
+/* make header width multiple of 4 */
+#define HDR_SIZE (sizeof(segment_header_t))
+#define HEADER_ALIGN (ALIGNMENT - (HDR_SIZE % ALIGNMENT))
+#define SEG_HEADER_SIZE (HDR_SIZE + HEADER_ALIGN)
 
 /* heap information for malloc */
 static struct {
@@ -26,6 +29,7 @@ static struct {
 
 static void
 init_malloc(void) {
+    /* static int is used to run this function only once */
     static int done = 0;
     if (done) return;
     heap.start = syscall_memlimit(NULL);
@@ -176,11 +180,8 @@ last_free(segment_header_t *freed_header) {
 void *
 malloc(int size) {
     segment_header_t *seg;
-
     init_malloc();
-
     if (adjust_size(&size) < 0) return NULL;
-
     seg = next_free(heap.start, size);
     if (!seg) return NULL;
     /* we found proper slot */
